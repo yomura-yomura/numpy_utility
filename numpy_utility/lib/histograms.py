@@ -64,7 +64,6 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None):
     except MemoryError as e:
         warnings.warn(f"Encountered MemoryError: {e}")
         bins = np.linspace(np.min(bins), np.max(bins), n_bins_limit)
-
     return bins
 
 
@@ -78,6 +77,7 @@ def histogram(a, bins=10, range=None, weights=None, density=None):
 
     if is_numeric(a):
         counts, bins = np.histogram(a, bins, range, normed, weights, density)
+
     elif np.issubdtype(a.dtype, np.datetime64):
         subtracted_bins = (bins - np.min(a)).astype(int)
         subtracted_a = (a - np.min(a)).astype(int)
@@ -92,4 +92,3 @@ def histogram(a, bins=10, range=None, weights=None, density=None):
         raise NotImplementedError(f"Unexpected type: {a.dtype}")
 
     return counts, bins
-
