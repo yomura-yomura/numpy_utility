@@ -27,7 +27,10 @@ def get_array_matched_with_boolean_array(array, boolean_array, remove_all_masked
 
 
 def is_array(obj):
-    return isinstance(obj, (list, tuple, set, np.ndarray))
+    return (
+        isinstance(obj, (list, tuple, set)) or
+        (isinstance(obj, np.ndarray) and np.ndim(obj) != 0)
+    )
 
 
 def combine_structured_arrays(a1, a2):
