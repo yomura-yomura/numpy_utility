@@ -5,6 +5,7 @@ from ..core.fromnumeric import is_array
 
 
 __all__ = ["histogram", "histogram_bin_edges", "histogram_bin_centers", "histogram_bin_widths"]
+n_bins_limit = 10000
 
 
 def histogram_bin_centers(bins):
@@ -32,8 +33,6 @@ def histogram_bin_widths(bins):
 
 
 def histogram_bin_edges(a, bins=10, range=None, weights=None):
-    n_bins_limit = 10000
-
     if is_array(bins):
         return bins
 
@@ -52,6 +51,7 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None):
     elif is_floating(a):
         pass
     elif np.issubdtype(a.dtype, np.bool_) or np.issubdtype(a.dtype, np.str_):
+        # Not implemented yet that bins affect nothing
         bins = np.unique(a)
     else:
         raise NotImplementedError(f"Unexpected type: {a.dtype}")
@@ -63,7 +63,7 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None):
             bins = np.linspace(np.min(bins), np.max(bins), n_bins_limit)
     except MemoryError as e:
         warnings.warn(f"Encountered MemoryError: {e}")
-        bins = np.linspace(np.min(bins), np.max(bins), n_bins_limit)
+        bins = np.linspace(np.min(a), np.max(a), n_bins_limit)
     return bins
 
 
@@ -85,7 +85,10 @@ def histogram(a, bins=10, range=None, weights=None, density=None):
         time_unit = np.datetime_data(a.dtype)[0]
         bins = np.min(a) + bins.astype(f"timedelta64[{time_unit}]")
     elif np.issubdtype(a.dtype, np.bool_) or np.issubdtype(a.dtype, np.str_):
-        bins, counts = np.unique(a, return_counts=True)
+        x, y = np.unique(a, return_counts=True)
+        counts = np.array([0] * len(bins))
+        counts[bins == x] = y
+
         if density is True:
             counts = counts / np.sum(counts)
     else:
