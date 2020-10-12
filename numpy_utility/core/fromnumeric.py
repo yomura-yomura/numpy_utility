@@ -7,7 +7,8 @@ __all__ = [
     "is_array",
     "combine_structured_arrays",
     "add_new_field_to",
-    "change_field_format_to"
+    "change_field_format_to",
+    "get_new_array_with_field_names"
 ]
 
 
@@ -60,4 +61,11 @@ def change_field_format_to(a, new_field_format):
                 for k, *sub in a.dtype.descr]
     new_a = np.empty_like(a, new_type)
     np.lib.recfunctions.recursive_fill_fields(a, new_a)
+    return new_a
+
+
+def get_new_array_with_field_names(a, field_names):
+    assert is_array(field_names)
+    new_a = a[field_names]
+    new_a = new_a.astype([d for d in new_a.dtype.descr if d[0] != ""])
     return new_a
