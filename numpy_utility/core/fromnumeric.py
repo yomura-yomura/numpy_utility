@@ -9,7 +9,8 @@ __all__ = [
     "add_new_field_to",
     "remove_field_from",
     "change_field_format_to",
-    "get_new_array_with_field_names"
+    "get_new_array_with_field_names",
+    "search_matched"
 ]
 
 
