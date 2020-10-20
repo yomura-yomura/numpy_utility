@@ -7,6 +7,7 @@ __all__ = [
     "is_array",
     "combine_structured_arrays",
     "add_new_field_to",
+    "remove_field_from",
     "change_field_format_to",
     "get_new_array_with_field_names"
 ]
@@ -53,6 +54,10 @@ def add_new_field_to(a, new_field, filled=None):
     return new_a
 
 
+def remove_field_from(a, field):
+    return get_new_array_with_field_names(a, [field_name for field_name, *_ in a.dtype.descr if field_name != field])
+
+
 def change_field_format_to(a, new_field_format):
     """
     new_field_format: dict type: {[field name]: [format]}
@@ -69,3 +74,13 @@ def get_new_array_with_field_names(a, field_names):
     new_a = a[field_names]
     new_a = new_a.astype([d for d in new_a.dtype.descr if d[0] != ""])
     return new_a
+
+
+def search_matched(a, v):
+    sorted_indices = np.argsort(a)
+    indices = np.searchsorted(a, v, side="left", sorter=sorted_indices)
+    indices_right = np.searchsorted(a, v, side="right", sorter=sorted_indices)
+
+    assert np.all(indices_right - indices <= 1)
+    return indices[indices_right - indices == 1]
+
