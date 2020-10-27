@@ -82,6 +82,13 @@ def search_matched(a, v):
     indices = np.searchsorted(a, v, side="left", sorter=sorted_indices)
     indices_right = np.searchsorted(a, v, side="right", sorter=sorted_indices)
 
-    assert np.all(indices_right - indices <= 1)
-    return indices[indices_right - indices == 1]
+    spans = indices_right - indices
+    if np.any(spans > 1):
+        assert np.any(np.unique(v, return_counts=True)[1] > 1)
+        raise ValueError("duplicate values found in v")
+
+    # if np.any(spans == 0):
+    #     return np.ma.MaskedArray(data=indices, mask=spans == 0)
+    # else:
+    return indices[spans == 1]
 
