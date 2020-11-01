@@ -1,11 +1,37 @@
 import numpy as np
 import functools
 import itertools
-
+from ..core import is_array
 
 __all__ = [
+    "from_jagged_array"
     # "vectorize"
 ]
+
+
+def _estimate_type(a):
+    dtype = np.array(a).dtype
+    if np.issubdtype(dtype, np.object_):
+        raise ValueError(f"Couldn't estimate type of {a}")
+    return dtype
+
+
+def from_jagged_array(pylist, horizontal_size=-1):
+    assert is_array(pylist)
+
+    lens = np.array([len(pl) for pl in pylist])
+    lens_max = lens.max()
+    flatten_pylist = [e for pl in pylist for e in pl]
+
+    mask = lens[:, np.newaxis] <= np.arange(max(lens_max, horizontal_size))
+    a = np.ma.empty(mask.shape, _estimate_type(flatten_pylist))
+    a[~mask] = flatten_pylist
+    a.mask = mask
+
+    if 0 < horizontal_size < lens_max:
+        return a[:, :horizontal_size]
+
+    return a
 
 
 # 車輪の再発明: np.vectorizeで実現可能

@@ -1,5 +1,8 @@
 import numpy as np
 
+# 分類難しいの。とりあえず。
+
+
 __all__ = ["binning", "get_indices_groups_of_continuous_duplicate_numbers"]
 
 
