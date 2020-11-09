@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.lib.recfunctions
-
+from ..core import is_integer
 
 __all__ = [
     "get_array_matched_with_boolean_array",
@@ -10,7 +10,11 @@ __all__ = [
     "remove_field_from",
     "change_field_format_to",
     "get_new_array_with_field_names",
-    "search_matched"
+    "search_matched",
+    "from_dict",
+    "reshape",
+    "any_along_column",
+    "all_along_column"
 ]
 
 
@@ -92,3 +96,79 @@ def search_matched(a, v):
     # else:
     return indices[spans == 1]
 
+
+# Maybe should be in a file _multiarray_umath.py
+def from_dict(data):
+    if isinstance(data, dict):
+        new_array = [from_dict(v) for v in data.values()]
+    else:
+        return np.array(data)
+        # if isinstance(data, np.ndarray):
+        #     return data
+        # else:
+        #     return np.array(data)
+
+    def get_dtype(a):
+        if a.dtype.names is None:
+            return *a.dtype.descr[0][1:], *a.shape[1:]
+        else:
+            return a.dtype.descr,
+
+    new_dtype = [(k, *get_dtype(na)) for k, na in zip(data.keys(), new_array)]
+    return np.array(list(zip(*new_array)), new_dtype)
+
+
+def reshape(a, newshape, drop=True):
+    # if drop is False:
+    #     return np.reshape(a, newshape)
+
+    if is_array(newshape):
+        pass
+    elif is_integer(newshape):
+        newshape = (newshape,)
+    else:
+        raise TypeError(f"'{type(newshape)}' object cannot be interpreted as an integer")
+
+    a = np.array(a)
+    newshape = np.array(newshape)
+
+    i_unknown_dimensions = np.where(newshape < 0)[0]
+    if i_unknown_dimensions.size == 0:
+        pass
+    elif i_unknown_dimensions.size == 1:
+        newshape[i_unknown_dimensions[0]] = np.floor(a.size / np.prod(newshape[newshape >= 0]))
+    else:
+        raise ValueError("can only specify one unknown dimension")
+
+    new_size = a.size - a.size % np.prod(newshape)
+    if a.size < new_size:
+        raise ValueError(f"cannot reshape array of size {a.size} into shape {tuple(newshape)}")
+
+    if drop is True:
+        return a[:new_size].reshape(newshape)
+    else:
+        return a.reshape(newshape)
+
+
+def any_along_column(a):
+    assert a.dtype.names is not None
+    assert len(a.dtype.names) > 0
+
+    ndim = a.ndim
+    return np.any(
+        [a[n] if a[n].ndim <= ndim else a[n].any(axis=tuple(np.arange(ndim, a[n].ndim)))
+         for n in a.dtype.names],
+        axis=0
+    )
+
+
+def all_along_column(a):
+    assert a.dtype.names is not None
+    assert len(a.dtype.names) > 0
+
+    ndim = a.ndim
+    return np.all(
+        [a[n] if a[n].ndim <= ndim else a[n].any(axis=tuple(np.arange(ndim, a[n].ndim)))
+         for n in a.dtype.names],
+        axis=0
+    )
