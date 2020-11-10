@@ -110,7 +110,7 @@ def from_dict(data):
 
     def get_dtype(a):
         if a.dtype.names is None:
-            return *a.dtype.descr[0][1:], *a.shape[1:]
+            return (*a.dtype.descr[0][1:], *a.shape[1:])
         else:
             return a.dtype.descr,
 
@@ -156,7 +156,8 @@ def any_along_column(a):
 
     ndim = a.ndim
     return np.any(
-        [a[n] if a[n].ndim <= ndim else a[n].any(axis=tuple(np.arange(ndim, a[n].ndim)))
+        [(a[n] if a[n].dtype.names is None else any_along_column(a[n]))
+         if a[n].ndim <= ndim else a[n].any(axis=tuple(np.arange(ndim, a[n].ndim)))
          for n in a.dtype.names],
         axis=0
     )
@@ -168,7 +169,8 @@ def all_along_column(a):
 
     ndim = a.ndim
     return np.all(
-        [a[n] if a[n].ndim <= ndim else a[n].any(axis=tuple(np.arange(ndim, a[n].ndim)))
+        [(a[n] if a[n].dtype.names is None else all_along_column(a[n]))
+         if a[n].ndim <= ndim else a[n].all(axis=tuple(np.arange(ndim, a[n].ndim)))
          for n in a.dtype.names],
         axis=0
     )
