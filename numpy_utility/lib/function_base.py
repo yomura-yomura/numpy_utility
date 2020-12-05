@@ -42,18 +42,18 @@ def vectorize(func, progress_kwargs={}, multi_output=False):
 
         returned_rows = [func(**kwargs_row) for kwargs_row in kwargs_rows]
         # Remove invalid rows
-        returned_rows = [r for r in returned_rows if r]
+        returned_rows = [r for r in returned_rows if r is not None]
 
         if not multi_output:
             returned_rows = [[r] for r in returned_rows]
 
+        if len(returned_rows) == 0:
+            return None
+            # raise ValueError("No returned values are not allowed.")
 
         common_returned_length = _len(returned_rows[0])
         assert all(common_returned_length == _len(returned_row) for returned_row in returned_rows)
 
-        # if common_returned_length == 0:
-        #     return returned_rows
-        # else:
         if np.any([isinstance(r, np.ma.MaskedArray) for row in returned_rows for r in row]):
             concatenate = np.ma.concatenate
         else:

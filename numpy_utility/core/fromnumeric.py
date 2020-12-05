@@ -60,7 +60,14 @@ def add_new_field_to(a, new_field, filled=None):
 
 
 def remove_field_from(a, field):
-    return get_new_array_with_field_names(a, [field_name for field_name, *_ in a.dtype.descr if field_name != field])
+    if is_array(field):
+        return get_new_array_with_field_names(
+            a, [field_name for field_name, *_ in a.dtype.descr if field_name not in field]
+        )
+    else:
+        return get_new_array_with_field_names(
+            a, [field_name for field_name, *_ in a.dtype.descr if field_name != field]
+        )
 
 
 def change_field_format_to(a, new_field_format):
@@ -98,15 +105,11 @@ def search_matched(a, v):
 
 
 # Maybe should be in a file _multiarray_umath.py
-def from_dict(data):
+def from_dict(data, strict=True):
     if isinstance(data, dict):
-        new_array = [from_dict(v) for v in data.values()]
+        new_array = [from_dict(v, strict) for v in data.values()]
     else:
         return np.array(data)
-        # if isinstance(data, np.ndarray):
-        #     return data
-        # else:
-        #     return np.array(data)
 
     def get_dtype(a):
         if a.dtype.names is None:
@@ -115,6 +118,11 @@ def from_dict(data):
             return a.dtype.descr,
 
     new_dtype = [(k, *get_dtype(na)) for k, na in zip(data.keys(), new_array)]
+
+    if strict is True:
+        if not all(len(new_array[0]) == len(na) for na in new_array[1:]):
+            raise ValueError(f"Mismatch length between {data.keys()}")
+
     return np.array(list(zip(*new_array)), new_dtype)
 
 

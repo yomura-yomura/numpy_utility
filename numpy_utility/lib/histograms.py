@@ -70,7 +70,6 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None):
 def histogram(a, bins=10, range=None, weights=None, density=None):
     normed = None
 
-    a = np.array(a)
     assert a.ndim == 1
 
     bins = histogram_bin_edges(a, bins, range, weights)
