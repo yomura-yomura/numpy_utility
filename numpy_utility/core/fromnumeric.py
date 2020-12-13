@@ -48,15 +48,22 @@ def combine_structured_arrays(a1, a2):
 
 
 def add_new_field_to(a, new_field, filled=None):
-    assert is_array(new_field)
-    if isinstance(new_field, tuple):
-        new_field = [new_field]
-    new_a = np.zeros(a.shape, a.dtype.descr + new_field)
-    np.lib.recfunctions.recursive_fill_fields(a, new_a)
-    if filled is not None:
-        field_names = [name for name, *_ in new_field]
-        new_a[field_names] = filled
-    return new_a
+    if is_array(new_field):
+        if isinstance(new_field, tuple):
+            new_field = [new_field]
+        new_a = np.zeros(a.shape, a.dtype.descr + new_field)
+        np.lib.recfunctions.recursive_fill_fields(a, new_a)
+        if filled is not None:
+            for name, *_ in new_field:
+                new_a[name] = filled
+        return new_a
+    elif isinstance(new_field, str):
+        if filled is None:
+            raise ValueError
+        filled_a = np.array(filled)
+        return add_new_field_to(a, [(new_field, filled_a.dtype.descr)], filled_a)
+    else:
+        raise ValueError(new_field)
 
 
 def remove_field_from(a, field):
@@ -108,6 +115,9 @@ def search_matched(a, v):
 def from_dict(data, strict=True):
     if isinstance(data, dict):
         new_array = [from_dict(v, strict) for v in data.values()]
+        masked_found = any(isinstance(na, np.ma.MaskedArray) for na in new_array)
+    elif isinstance(data, np.ndarray):
+        return data
     else:
         return np.array(data)
 
@@ -123,7 +133,11 @@ def from_dict(data, strict=True):
         if not all(len(new_array[0]) == len(na) for na in new_array[1:]):
             raise ValueError(f"Mismatch length between {data.keys()}")
 
-    return np.array(list(zip(*new_array)), new_dtype)
+    if masked_found:
+        return np.ma.mrecords.fromarrays(new_array, new_dtype)
+        # return np.ma.array(list(zip(*new_array)), new_dtype)
+    else:
+        return np.array(list(zip(*new_array)), new_dtype)
 
 
 def reshape(a, newshape, drop=True):

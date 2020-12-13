@@ -6,7 +6,7 @@ import numpy as np
 __all__ = ["binning", "get_indices_groups_of_continuous_duplicate_numbers"]
 
 
-def binning(x, y, min_bin_x=None, max_bin_x=None, step_bin_x=1, sqrt_n_division=True, allowed_minimum_size=None):
+def binning(x, y, min_bin_x=None, max_bin_x=None, step_bin_x=1, sqrt_n_division=True, allowed_minimum_size=None, return_sample_size=False):
     """
     x, y : array-like object, MaskedArray
     """
@@ -34,13 +34,19 @@ def binning(x, y, min_bin_x=None, max_bin_x=None, step_bin_x=1, sqrt_n_division=
         binned_x = binned_x[[True if allowed_minimum_size <= y.size else False for y in _binned_y]]
         _binned_y = [y for y in _binned_y if allowed_minimum_size <= y.size]
 
+    n_y = np.array([y.size if y.size != 0 else 0 for y in _binned_y])
     mean_y = np.array([y.mean() if y.size != 0 else 0 for y in _binned_y])
-    if sqrt_n_division:
-        err_y = np.array([y.std() / np.sqrt(y.size) if y.size != 0 else 0 for y in _binned_y])
-    else:
-        err_y = np.array([y.std() if y.size != 0 else 0 for y in _binned_y])
+    err_y = np.array([(y - my).std() if y.size != 0 else 0 for my, y in zip(mean_y, _binned_y)])
 
-    return binned_x, mean_y, err_y
+    if sqrt_n_division:
+        err_y = err_y / np.sqrt(n_y)
+
+    ret = (binned_x, mean_y, err_y)
+
+    if return_sample_size:
+        ret += (n_y,)
+
+    return ret
 
 
 def get_indices_groups_of_continuous_duplicate_numbers(x):
