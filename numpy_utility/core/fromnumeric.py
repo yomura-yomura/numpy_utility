@@ -14,7 +14,8 @@ __all__ = [
     "from_dict",
     "reshape",
     "any_along_column",
-    "all_along_column"
+    "all_along_column",
+    "flatten_structured_array"
 ]
 
 
@@ -196,3 +197,22 @@ def all_along_column(a):
          for n in a.dtype.names],
         axis=0
     )
+
+
+def flatten_structured_array(a, sep="/", flatten_2d=False):
+    if a.dtype.names is None:
+        return a
+
+    d = {}
+    for name in a.dtype.names:
+        if a[name].dtype.names is None:
+            if flatten_2d is True and a[name].ndim == 2:
+                for i in range(a[name].shape[1]):
+                    d[f"{name}{sep}f{i}"] = a[name][:, i]
+            else:
+                d[name] = a[name]
+        else:
+            flatten = flatten_structured_array(a[name], sep, flatten_2d)
+            for k in flatten.dtype.names:
+                d[f"{name}{sep}{k}"] = flatten[k]
+    return from_dict(d)
