@@ -15,7 +15,8 @@ __all__ = [
     "reshape",
     "any_along_column",
     "all_along_column",
-    "flatten_structured_array"
+    "flatten_structured_array",
+    "groupby"
 ]
 
 
@@ -113,20 +114,40 @@ def search_matched(a, v):
 
 
 # Maybe should be in a file _multiarray_umath.py
-def from_dict(data, strict=True):
+def from_dict(data, strict=True, use_common_dims=True):
     if isinstance(data, dict):
-        new_array = [from_dict(v, strict) for v in data.values()]
+        new_array = [from_dict(v, strict, use_common_dims) for v in data.values()]
         masked_found = any(isinstance(na, np.ma.MaskedArray) for na in new_array)
     elif isinstance(data, np.ndarray):
         return data
     else:
         return np.array(data)
 
-    def get_dtype(a):
-        if a.dtype.names is None:
-            return (*a.dtype.descr[0][1:], *a.shape[1:])
+    if use_common_dims:
+        max_ndim = min(v.ndim for v in new_array)
+        ndim_start = np.count_nonzero([
+            len(np.unique([v.shape[:i] for v in new_array], axis=0)) == 1 for i in range(1, max_ndim + 1)
+        ])
+        if ndim_start > 0:
+            common_shape = np.unique([v.shape[:ndim_start] for v in new_array], axis=0)[0]
         else:
-            return a.dtype.descr,
+            common_shape = ()
+
+        if len(common_shape) > 1:
+            flatten_ret = from_dict({
+                k: v.flatten() if v.ndim <= ndim_start else v.reshape((-1, *v.shape[ndim_start:]))
+                for k, v in data.items()
+            }, strict, use_common_dims)
+            return flatten_ret.reshape(common_shape)
+    else:
+        ndim_start = 0
+
+    def get_dtype(a):
+        pre_descr = a.dtype.descr[0][1:] if a.dtype.names is None else [a.dtype.descr]
+        if a.ndim <= ndim_start:
+            return pre_descr
+        else:
+            return (*pre_descr, a.shape[ndim_start:])
 
     new_dtype = [(k, *get_dtype(na)) for k, na in zip(data.keys(), new_array)]
 
@@ -135,8 +156,10 @@ def from_dict(data, strict=True):
             raise ValueError(f"Mismatch length between {data.keys()}")
 
     if masked_found:
-        return np.ma.mrecords.fromarrays(new_array, new_dtype)
-        # return np.ma.array(list(zip(*new_array)), new_dtype)
+        return np.ma.mrecords.fromarrays(
+            new_array,
+            dtype=new_dtype
+        ).view(np.ma.MaskedArray)
     else:
         return np.array(list(zip(*new_array)), new_dtype)
 
@@ -216,3 +239,21 @@ def flatten_structured_array(a, sep="/", flatten_2d=False):
             for k in flatten.dtype.names:
                 d[f"{name}{sep}{k}"] = flatten[k]
     return from_dict(d)
+
+
+def groupby(a, by, *other_by, without_masked=True):
+    assert is_array(a)
+
+    def get_boolean_groupby(a, by, *other_by, without_masked=True):
+        if len(other_by) == 0:
+            return [(key, key == a[by])
+                    for key in np.unique(a[by].compressed()
+                                         if isinstance(a[by], np.ma.MaskedArray) and without_masked else a[by])]
+        else:
+            return get_boolean_groupby(a[by], *other_by, without_masked=without_masked)
+
+    for key, boolean_array in get_boolean_groupby(a, by, *other_by, without_masked=without_masked):
+        yield (
+            key,
+            a[boolean_array].data if isinstance(a[by], np.ma.MaskedArray) and without_masked else a[boolean_array]
+        )

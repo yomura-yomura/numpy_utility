@@ -1,12 +1,17 @@
 import numpy as np
 import functools
 import itertools
-from ..core import is_array
+from ..core import is_array, from_dict
 
 
 __all__ = [
-    "from_jagged_array"
+    "from_jagged_array",
     # "vectorize"
+
+    "apply",
+    "flatten",
+    "is_structured_array",
+    "merge_arrays"
 ]
 
 
@@ -74,9 +79,9 @@ def from_jagged_array(pylist, horizontal_size=-1, dtype=None):
         dtype = _estimate_type(flatten_pylist)
 
     # mask = lens[:, np.newaxis] <= np.arange(max(lens_max, horizontal_size))
-    mask = lens[..., np.newaxis] <= np.expand_dims(np.arange(max(lens_max, horizontal_size)),
-                                                   np.arange(lens.ndim).tolist())
-    mask = lens <= np.expand_dims(np.arange(max(lens_max, horizontal_size)), np.arange(lens.ndim - 1).tolist())
+    # mask = lens[..., np.newaxis] <= np.expand_dims(np.arange(max(lens_max, horizontal_size)),
+    #                                                np.arange(lens.ndim).tolist())
+    mask = lens[..., np.newaxis] <= np.expand_dims(np.arange(max(lens_max, horizontal_size)), np.arange(lens.ndim - 1).tolist())
     a = np.ma.empty(mask.shape, dtype)
     a[~mask] = flatten_pylist
     a.mask = mask
@@ -85,6 +90,15 @@ def from_jagged_array(pylist, horizontal_size=-1, dtype=None):
         return a[..., :horizontal_size]
 
     return a
+
+
+def merge_arrays(arrays):
+    raw_dict = [(name, a[name]) for a in arrays for name in a.dtype.names]
+    if any(np.unique([k for k, _ in raw_dict], return_counts=True)[1] > 1):
+        n, c = np.unique([k for k, _ in raw_dict], return_counts=True)
+        raise ValueError(f"field '{n[np.argmax(c)]}' occurs more than once")
+
+    return from_dict(dict(raw_dict))
 
 
 # 車輪の再発明: np.vectorizeで実現可能
