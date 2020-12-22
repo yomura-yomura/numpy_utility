@@ -1,44 +1,13 @@
 import numpy as np
 import functools
 import itertools
-from ..core import is_array, from_dict
+from ..core import from_dict
 
 
 __all__ = [
-    "from_jagged_array",
-    # "vectorize"
-
-    "apply",
-    "flatten",
     "is_structured_array",
     "merge_arrays"
 ]
-
-
-def _estimate_type(a):
-    dtype = np.array(a).dtype
-    if np.issubdtype(dtype, np.object_):
-        raise ValueError(f"Couldn't estimate type of {a}")
-    return dtype
-
-
-def flatten(a, max_depth=-1):
-    """
-    extended for jagged array
-    """
-    if max_depth == 0:
-        return [a]
-
-    if np.ndim(a) == 0:
-        return [a]
-    else:
-        return [iia for ia in a for iia in flatten(ia, max_depth - 1)]
-
-
-def apply(func, a, axis=None):
-    assert axis is None
-    applied_flatten_a = [func(ia) for ia in flatten(a, max_depth=np.ndim(a))]
-    return np.reshape(applied_flatten_a, (*np.shape(a), *np.shape(applied_flatten_a)[1:]))
 
 
 def is_structured_array(a: np.ndarray):
@@ -63,33 +32,6 @@ def divide(x1, x2):
             raise NotImplementedError
     else:
         return np.divide(x1, x2)
-
-
-def from_jagged_array(pylist, horizontal_size=-1, dtype=None):
-    # assert np.ndim(pylist) < 2
-    assert is_array(pylist)
-
-    # lens = np.array([len(pl) for pl in pylist])
-    lens = apply(len, pylist)
-    lens_max = lens.max()
-    # flatten_pylist = [e for pl in pylist for e in pl]
-    flatten_pylist = flatten(pylist)
-
-    if dtype is None:
-        dtype = _estimate_type(flatten_pylist)
-
-    # mask = lens[:, np.newaxis] <= np.arange(max(lens_max, horizontal_size))
-    # mask = lens[..., np.newaxis] <= np.expand_dims(np.arange(max(lens_max, horizontal_size)),
-    #                                                np.arange(lens.ndim).tolist())
-    mask = lens[..., np.newaxis] <= np.expand_dims(np.arange(max(lens_max, horizontal_size)), np.arange(lens.ndim - 1).tolist())
-    a = np.ma.empty(mask.shape, dtype)
-    a[~mask] = flatten_pylist
-    a.mask = mask
-
-    if 0 < horizontal_size < lens_max:
-        return a[..., :horizontal_size]
-
-    return a
 
 
 def merge_arrays(arrays):

@@ -2,6 +2,8 @@ import numpy as np
 import inspect
 import functools
 import tqdm
+import sys
+
 
 __all__ = [
     "vectorize",
@@ -9,13 +11,25 @@ __all__ = [
 ]
 
 
-@np.core.overrides.set_module("numpy_utility")
-def vectorize(func, progress_kwargs={}, multi_output=False):
+# @np.core.overrides.set_module("numpy_utility")
+def vectorize(func, progress_kwargs={}, multi_output=False, concat=False, errors="raise"):
     def _len(a):
         try:
             return len(a)
         except TypeError:
             return 0
+
+    if errors == "raise":
+        func_ = func
+    elif errors == "coerce":
+        def func_(**kwargs):
+            try:
+                return func(**kwargs)
+            except BaseException as e:
+                print(repr(e), file=sys.stderr)
+                return None
+    else:
+        raise ValueError(errors)
 
     @functools.wraps(func)
     def _inner(*args, **kwargs):
@@ -40,8 +54,9 @@ def vectorize(func, progress_kwargs={}, multi_output=False):
         if progress_kwargs:
             kwargs_rows = tqdm.tqdm(kwargs_rows, **progress_kwargs)
 
-        returned_rows = [func(**kwargs_row) for kwargs_row in kwargs_rows]
+        returned_rows = [func_(**kwargs_row) for kwargs_row in kwargs_rows]
         # Remove invalid rows
+        mask = np.array([r is None for r in returned_rows])
         returned_rows = [r for r in returned_rows if r is not None]
 
         if not multi_output:
@@ -54,12 +69,27 @@ def vectorize(func, progress_kwargs={}, multi_output=False):
         common_returned_length = _len(returned_rows[0])
         assert all(common_returned_length == _len(returned_row) for returned_row in returned_rows)
 
-        if np.any([isinstance(r, np.ma.MaskedArray) for row in returned_rows for r in row]):
-            concatenate = np.ma.concatenate
+        if concat:
+            if np.any([isinstance(r, np.ma.MaskedArray) for row in returned_rows for r in row]):
+                concatenate = np.ma.concatenate
+            else:
+                concatenate = np.concatenate
+            ret = [concatenate(returned_col) for returned_col in zip(*returned_rows)]
         else:
-            concatenate = np.concatenate
+            if np.any([isinstance(r, np.ma.MaskedArray) for row in returned_rows for r in row]):
+                def array(a):
+                    return np.ma.MaskedArray([e.data for e in a], [e.mask for e in a])
+            else:
+                array = np.array
+            ret = [array(list(returned_col)) for returned_col in zip(*returned_rows)]
 
-        ret = [concatenate(returned_col) for returned_col in zip(*returned_rows)]
+        if mask.any():
+            for i in range(len(ret)):
+                new = np.ma.empty((mask.shape[0], *ret[i].shape[1:]), dtype=ret[i].dtype)
+                new.mask = mask
+                new[~mask] = ret[i]
+                ret[i] = new
+
         if multi_output:
             return ret
         else:
@@ -70,7 +100,7 @@ def vectorize(func, progress_kwargs={}, multi_output=False):
 
 
 @np.core.overrides.set_module("numpy_utility")
-def vectorize_wrapper(progress_kwargs={}, multi_output=False):
+def vectorize_wrapper(progress_kwargs={}, multi_output=False, concat=False, errors="raise"):
     def _inner(func):
-        return vectorize(func, progress_kwargs, multi_output)
+        return vectorize(func, progress_kwargs, multi_output, concat, errors)
     return _inner
