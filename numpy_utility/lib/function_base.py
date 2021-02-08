@@ -12,7 +12,7 @@ __all__ = [
 
 
 # @np.core.overrides.set_module("numpy_utility")
-def vectorize(func, progress_kwargs={}, multi_output=False, concat=False, errors="raise"):
+def vectorize(func, progress_kwargs={}, multi_output=False, concat=False, errors="raise", ignore_kwargs=()):
     def _len(a):
         try:
             return len(a)
@@ -33,22 +33,26 @@ def vectorize(func, progress_kwargs={}, multi_output=False, concat=False, errors
 
     @functools.wraps(func)
     def _inner(*args, **kwargs):
-        # Copy all args values into kwargs
+        # Add all args values to kwargs
         kwargs.update(dict(zip(inspect.signature(func).parameters.keys(), args)))
 
         # Expand 0-dim to corresponding n-dim args
-        common_ndim = max(np.ndim(v) for v in kwargs.values())
+        common_ndim = max(np.ndim(v) for k, v in kwargs.items() if k not in ignore_kwargs)
         # 0-dim to 1-dim args
         common_ndim = max(common_ndim, 1)
+        assert common_ndim == 1
 
         kwargs.update(dict([
-            (k, [v] * common_ndim) if np.ndim(v) == 0 else (k, v)
+            (k, [v] * common_ndim) if (k in ignore_kwargs) or np.ndim(v) == 0 else (k, v)
             for k, v in kwargs.items()
         ]))
 
+        from .. import ja
+        common_len = ja.apply(len, list(kwargs.values()), 1).max()
+
         kwargs_rows = [
             {k: v for k, v in zip(kwargs.keys(), row_values)}
-            for row_values in zip(*np.broadcast_arrays(*kwargs.values()))
+            for row_values in zip(*(v if len(v) == common_len else v * common_len for v in kwargs.values()))
         ]
 
         if progress_kwargs:
@@ -100,7 +104,7 @@ def vectorize(func, progress_kwargs={}, multi_output=False, concat=False, errors
 
 
 @np.core.overrides.set_module("numpy_utility")
-def vectorize_wrapper(progress_kwargs={}, multi_output=False, concat=False, errors="raise"):
+def vectorize_wrapper(progress_kwargs={}, multi_output=False, concat=False, errors="raise", ignore_kwargs=()):
     def _inner(func):
-        return vectorize(func, progress_kwargs, multi_output, concat, errors)
+        return vectorize(func, progress_kwargs, multi_output, concat, errors, ignore_kwargs)
     return _inner
