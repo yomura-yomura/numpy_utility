@@ -245,15 +245,20 @@ def groupby(a, by, *other_by, without_masked=True):
     assert is_array(a)
 
     def get_boolean_groupby(a, by, *other_by, without_masked=True):
+        if not is_array(by):
+            by = a[by]
         if len(other_by) == 0:
-            return [(key, key == a[by])
-                    for key in np.unique(a[by].compressed()
-                                         if isinstance(a[by], np.ma.MaskedArray) and without_masked else a[by])]
+            return [
+                (key, key == by)
+                for key in np.unique(
+                    by.compressed() if isinstance(by, np.ma.MaskedArray) and without_masked else by
+                )
+            ]
         else:
             return get_boolean_groupby(a[by], *other_by, without_masked=without_masked)
 
     for key, boolean_array in get_boolean_groupby(a, by, *other_by, without_masked=without_masked):
         yield (
             key,
-            a[boolean_array].data if isinstance(a[by], np.ma.MaskedArray) and without_masked else a[boolean_array]
+            a[boolean_array].data if isinstance(a, np.ma.MaskedArray) and without_masked else a[boolean_array]
         )
