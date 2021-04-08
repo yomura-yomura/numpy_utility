@@ -10,8 +10,8 @@ __all__ = ["ndim", "flatten", "apply", "from_jagged_array"]
 
 def _estimate_type(a):
     dtype = np.array(a).dtype
-    if np.issubdtype(dtype, np.object_):
-        raise ValueError(f"Couldn't estimate type of {a}")
+    # if np.issubdtype(dtype, np.object_):
+    #     raise ValueError(f"Couldn't estimate type of {a}")
     return dtype
 
 
