@@ -20,12 +20,12 @@ __all__ = [
 ]
 
 
-def get_array_matched_with_boolean_array(array, boolean_array, remove_all_masked_rows=False):
+def get_array_matched_with_boolean_array(a, boolean_array, remove_all_masked_rows=False):
     assert(1 <= boolean_array.ndim <= 2)
-    assert(array.size == boolean_array.shape[-1])
+    assert(a.size == boolean_array.shape[-1])
 
-    new_array = np.ma.empty(boolean_array.shape, dtype=array.dtype)
-    new_array[boolean_array] = array[np.where(boolean_array)[-1]]
+    new_array = np.ma.empty(boolean_array.shape, dtype=a.dtype)
+    new_array[boolean_array] = a[np.where(boolean_array)[-1]]
     new_array.mask = ~boolean_array
 
     if remove_all_masked_rows:

@@ -1,0 +1,6 @@
+.idea
+numpy_utility/__pycache__/
+numpy_utility/core/__pycache__/
+numpy_utility/io/__pycache__/
+numpy_utility/lib/__pycache__/
+numpy_utility/ma/__pycache__/
