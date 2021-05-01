@@ -1,6 +1,8 @@
 import numpy as np
 import numpy.lib.recfunctions
 from ..core import is_integer
+import builtins
+
 
 __all__ = [
     "get_array_matched_with_boolean_array",
@@ -13,10 +15,11 @@ __all__ = [
     "search_matched",
     "from_dict",
     "reshape",
-    "any_along_column",
-    "all_along_column",
     "flatten_structured_array",
-    "groupby"
+    "groupby",
+    "any",
+    "all",
+    "sum"
 ]
 
 
@@ -49,11 +52,17 @@ def combine_structured_arrays(a1, a2):
     return add_new_field_to(a1, new_fields, a2)
 
 
-def add_new_field_to(a, new_field, filled=None):
+def add_new_field_to(a, new_field, filled=None, insert_to=None):
     if is_array(new_field):
         if isinstance(new_field, tuple):
             new_field = [new_field]
-        new_a = np.zeros(a.shape, a.dtype.descr + new_field)
+        if insert_to is None:
+            new_descr = a.dtype.descr + new_field
+        else:
+            new_descr = a.dtype.descr.copy()
+            new_descr.insert(insert_to, new_field[0])
+
+        new_a = np.zeros(a.shape, new_descr)
         np.lib.recfunctions.recursive_fill_fields(a, new_a)
         if filled is not None:
             for name, *_ in new_field:
@@ -117,7 +126,7 @@ def search_matched(a, v):
 def from_dict(data, strict=True, use_common_dims=True):
     if isinstance(data, dict):
         new_array = [from_dict(v, strict, use_common_dims) for v in data.values()]
-        masked_found = any(isinstance(na, np.ma.MaskedArray) for na in new_array)
+        masked_found = builtins.any(isinstance(na, np.ma.MaskedArray) for na in new_array)
     elif isinstance(data, np.ndarray):
         return data
     else:
@@ -152,7 +161,7 @@ def from_dict(data, strict=True, use_common_dims=True):
     new_dtype = [(k, *get_dtype(na)) for k, na in zip(data.keys(), new_array)]
 
     if strict is True:
-        if not all(len(new_array[0]) == len(na) for na in new_array[1:]):
+        if not builtins.all(len(new_array[0]) == len(na) for na in new_array[1:]):
             raise ValueError(f"Mismatch length between {data.keys()}")
 
     if masked_found:
@@ -196,32 +205,6 @@ def reshape(a, newshape, drop=True):
         return a.reshape(newshape)
 
 
-def any_along_column(a):
-    assert a.dtype.names is not None
-    assert len(a.dtype.names) > 0
-
-    ndim = a.ndim
-    return np.any(
-        [(a[n] if a[n].dtype.names is None else any_along_column(a[n]))
-         if a[n].ndim <= ndim else a[n].any(axis=tuple(np.arange(ndim, a[n].ndim)))
-         for n in a.dtype.names],
-        axis=0
-    )
-
-
-def all_along_column(a):
-    assert a.dtype.names is not None
-    assert len(a.dtype.names) > 0
-
-    ndim = a.ndim
-    return np.all(
-        [(a[n] if a[n].dtype.names is None else all_along_column(a[n]))
-         if a[n].ndim <= ndim else a[n].all(axis=tuple(np.arange(ndim, a[n].ndim)))
-         for n in a.dtype.names],
-        axis=0
-    )
-
-
 def flatten_structured_array(a, sep="/", flatten_2d=False):
     if a.dtype.names is None:
         return a
@@ -262,3 +245,51 @@ def groupby(a, by, *other_by, without_masked=True):
             key,
             a[boolean_array].data if isinstance(a, np.ma.MaskedArray) and without_masked else a[boolean_array]
         )
+
+
+def _along_column(func, a):
+    return [
+        (a[n] if a[n].dtype.names is None else func(a[n], axis="column"))
+        if a[n].ndim <= a.ndim else func(a[n], axis=tuple(range(a.ndim, a[n].ndim)))
+        for n in a.dtype.names
+    ]
+
+
+def any(a, axis=None, out=None, keepdims=np._NoValue):
+    if axis == "column":
+        if a.dtype.names is None:
+            raise ValueError(f"'a' has no dtype.names with axis='column'")
+        ret = np.any(_along_column(any, a), axis=0, out=out, keepdims=keepdims)
+    else:
+        ret = np.any(a, axis, out, keepdims)
+    if np.issubdtype(ret.dtype, np.object_):
+        raise NotImplementedError("type of returned is object")
+    return ret
+
+
+def all(a, axis=None, out=None, keepdims=np._NoValue):
+    if axis == "column":
+        if a.dtype.names is None:
+            raise ValueError(f"'a' has no dtype.names with axis='column'")
+        ret = np.all(_along_column(all, a), axis=0, out=out, keepdims=keepdims)
+    else:
+        ret = np.all(a, axis, out, keepdims)
+    if np.issubdtype(ret.dtype, np.object_):
+        raise NotImplementedError("type of returned is object")
+    return ret
+
+
+def sum(a, axis=None, dtype=None, out=None, keepdims=np._NoValue,
+        initial=np._NoValue, where=np._NoValue):
+    a = a if isinstance(a, np.ma.MaskedArray) else np.asarray(a)
+
+    if axis == "column":
+        if a.dtype.names is None:
+            raise ValueError(f"'a' has no dtype.names with axis='column'")
+        ret = np.sum(_along_column(sum, a), axis=0, dtype=dtype, out=out, keepdims=keepdims,
+                     initial=initial, where=where)
+    else:
+        ret = np.sum(a, axis, dtype, out, keepdims, initial, where)
+    if np.issubdtype(ret.dtype, np.object_):
+        raise NotImplementedError("type of returned is object")
+    return ret

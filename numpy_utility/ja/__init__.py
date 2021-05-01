@@ -71,14 +71,22 @@ def from_jagged_array(pylist, horizontal_size=-1, dtype=None, axis=-1):
     assert axis == -1
 
     lens = apply(np.size, pylist, depth=-2)
+    # lens = apply(np.size, pylist, depth=-1)
 
     lens_max = np.max(lens)
 
     mask = lens[..., np.newaxis] <= np.expand_dims(np.arange(max(lens_max, horizontal_size)), tuple(range(lens.ndim)))
 
     if isinstance(pylist, np.ma.MaskedArray):
-        assert mask.ndim == pylist.ndim + 1
-        mask |= pylist.mask[..., np.newaxis]
+        assert all(len1 == len2 for len1, len2 in zip(mask.shape, pylist.mask.shape))
+        if mask.ndim > pylist.mask.ndim:
+            pylist_mask = np.expand_dims(pylist.mask, axis=(-1 - np.arange(mask.ndim - pylist.mask.ndim)).tolist())
+        elif mask.ndim == pylist.mask.ndim:
+            pylist_mask = pylist.mask
+        else:
+            raise NotImplementedError
+
+        mask |= pylist_mask
         flatten_pylist = flatten(pylist.data[~pylist.mask])
     else:
         flatten_pylist = flatten(pylist)

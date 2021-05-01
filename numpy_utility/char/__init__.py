@@ -4,7 +4,7 @@ import more_itertools
 import itertools
 from ..core import is_array
 
-__all__ = ["join"]
+__all__ = ["join", "read_null_terminated_string"]
 
 
 def is_string(a: np.ndarray):
@@ -33,3 +33,13 @@ def join(sep, seq, axis=None):
         lambda a, b: np.char.rstrip(np.char.add(a, b), sep),
         more_itertools.roundrobin(divided, itertools.repeat(sep, len(divided) - 1))
     )
+
+
+def read_null_terminated_string(buffer):
+    s_itemsize = buffer.dtype.itemsize
+    null_terminated_string = np.frombuffer(buffer, dtype="S1").reshape(-1, s_itemsize)
+    assert (null_terminated_string == b"").any(axis=1).all()
+    position_null_terminated = np.argmax(null_terminated_string == b"", axis=1)
+    invalid_mask = position_null_terminated[:, np.newaxis] < np.arange(16)
+    null_terminated_string[invalid_mask] = b""
+    return np.frombuffer(null_terminated_string, dtype=f"S{s_itemsize}")

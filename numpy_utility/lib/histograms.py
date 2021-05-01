@@ -32,7 +32,7 @@ def histogram_bin_widths(bins):
     return bins[1:] - bins[:-1]
 
 
-def histogram_bin_edges(a, bins=10, range=None, weights=None):
+def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
     if is_array(bins):
         return bins
 
@@ -57,7 +57,12 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None):
         raise NotImplementedError(f"Unexpected type: {a.dtype}")
 
     try:
-        bins = np.histogram_bin_edges(a, bins, range, weights)
+        if log:
+            log_a = np.log10(a)
+            log_a = log_a[~np.isnan(log_a)]
+            bins = 10 ** np.histogram_bin_edges(log_a, bins, range, weights)
+        else:
+            bins = np.histogram_bin_edges(a, bins, range, weights)
         if bins.size > n_bins_limit:
             warnings.warn(f"Huge bin size {bins.size} -> {n_bins_limit}")
             bins = np.linspace(np.min(bins), np.max(bins), n_bins_limit)
