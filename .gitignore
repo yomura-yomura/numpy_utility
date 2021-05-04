@@ -4,3 +4,7 @@ numpy_utility/core/__pycache__/
 numpy_utility/io/__pycache__/
 numpy_utility/lib/__pycache__/
 numpy_utility/ma/__pycache__/
+numpy_utility/char/__pycache__/
+numpy_utility/ja/__pycache__/
+numpy_utility/linalg/__pycache__/
+numpy_utility/omr/__pycache__/
