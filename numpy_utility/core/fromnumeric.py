@@ -62,17 +62,23 @@ def add_new_field_to(a, new_field, filled=None, insert_to=None):
             new_descr = a.dtype.descr.copy()
             new_descr.insert(insert_to, new_field[0])
 
-        new_a = np.zeros(a.shape, new_descr)
+        if isinstance(a, np.ma.MaskedArray):
+            new_a = np.ma.zeros(a.shape, new_descr)
+        else:
+            new_a = np.zeros(a.shape, new_descr)
+
         np.lib.recfunctions.recursive_fill_fields(a, new_a)
+
         if filled is not None:
             for name, *_ in new_field:
                 new_a[name] = filled
         return new_a
     elif isinstance(new_field, str):
         if filled is None:
-            raise ValueError
-        filled_a = np.array(filled)
-        return add_new_field_to(a, [(new_field, filled_a.dtype.descr)], filled_a)
+            raise ValueError("filled is None")
+        if not isinstance(filled, np.ma.MaskedArray):
+            filled = np.asarray(filled)
+        return add_new_field_to(a, [(new_field, filled.dtype.descr)], filled)
     else:
         raise ValueError(new_field)
 
