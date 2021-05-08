@@ -2,6 +2,7 @@ import numpy as np
 import numpy.lib.recfunctions
 from ..core import is_integer
 import builtins
+import warnings
 
 
 __all__ = [
@@ -120,12 +121,9 @@ def search_matched(a, v):
     spans = indices_right - indices
     if np.any(spans > 1):
         assert np.any(np.unique(v, return_counts=True)[1] > 1)
-        raise ValueError("duplicate values found in v")
+        raise ValueError("duplicate values found in a")
 
-    # if np.any(spans == 0):
-    #     return np.ma.MaskedArray(data=indices, mask=spans == 0)
-    # else:
-    return indices[spans == 1]
+    return sorted_indices.take(indices[spans == 1])
 
 
 # Maybe should be in a file _multiarray_umath.py
