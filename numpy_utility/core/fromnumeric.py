@@ -65,6 +65,8 @@ def add_new_field_to(a, new_field, filled=None, insert_to=None):
 
         if isinstance(a, np.ma.MaskedArray):
             new_a = np.ma.zeros(a.shape, new_descr)
+            from .. import bugfix
+            bugfix.np_ma_nat_fill_value.fix(new_a)
         else:
             new_a = np.zeros(a.shape, new_descr)
 
@@ -169,10 +171,13 @@ def from_dict(data, strict=True, use_common_dims=True):
             raise ValueError(f"Mismatch length between {data.keys()}")
 
     if masked_found:
-        return np.ma.mrecords.fromarrays(
+        from .. import bugfix
+        ret = np.ma.mrecords.fromarrays(
             new_array,
             dtype=new_dtype
         ).view(np.ma.MaskedArray)
+        bugfix.np_ma_nat_fill_value.fix(ret)
+        return ret
     else:
         return np.array(list(zip(*new_array)), new_dtype)
 
@@ -232,23 +237,38 @@ def groupby(a, by, *other_by, without_masked=True):
     assert is_array(a)
 
     def get_boolean_groupby(a, by, *other_by, without_masked=True):
-        if not is_array(by):
-            by = a[by]
         if len(other_by) == 0:
-            return [
-                (key, key == by)
-                for key in np.unique(
-                    by.compressed() if isinstance(by, np.ma.MaskedArray) and without_masked else by
-                )
-            ]
+            if isinstance(a, np.ma.MaskedArray) and without_masked:
+                if len(by) == 1:
+                    a_by = a[by].compressed()
+                elif len(by) > 1:
+                    a_by = a[by].data[~any(a[by].mask, axis="column")]
+                else:
+                    raise ValueError("len(by) >= 1")
+            else:
+                a_by = a[by]
+
+            unique_keys = np.unique(a_by, axis=0)
+            get_boolean_groupby.len = len(unique_keys)
+            return len(unique_keys), ((key, np.isin(a[by], key)) for key in unique_keys)
         else:
             return get_boolean_groupby(a[by], *other_by, without_masked=without_masked)
 
-    for key, boolean_array in get_boolean_groupby(a, by, *other_by, without_masked=without_masked):
-        yield (
-            key,
-            a[boolean_array].data if isinstance(a, np.ma.MaskedArray) and without_masked else a[boolean_array]
-        )
+    class GroupBy:
+        def __init__(self, length, generator):
+            self.len = length
+            self.generator = generator
+
+        def __iter__(self):
+            return (
+                (key, a[boolean_array].data if isinstance(a, np.ma.MaskedArray) and without_masked else a[boolean_array])
+                for key, boolean_array in self.generator
+            )
+
+        def __len__(self):
+            return self.len
+
+    return GroupBy(*get_boolean_groupby(a, by, *other_by, without_masked=without_masked))
 
 
 def _along_column(func, a):
