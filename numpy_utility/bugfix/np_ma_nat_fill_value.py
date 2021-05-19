@@ -23,18 +23,16 @@ def fix(a: np.ma.MaskedArray):
 
 
 def _change_datetime_nat(fill_fields, parent=None):
-    if fill_fields.dtype.names is None:
-        if np.issubdtype(fill_fields.dtype, np.datetime64):
-            mask = np.isnat(fill_fields)
-            if mask.any():
-                if fill_fields.ndim > 0:
-                    fill_fields[mask] = 0
-                else:
-                    parent[0][parent[1]] = 0
-    else:
-        # print(fill_fields.dtype.names)
-        for n in fill_fields.dtype.names:
-            if isinstance(fill_fields[n], np.record):
+    if hasattr(fill_fields, "dtype"):
+        if fill_fields.dtype.names is None:
+            if np.issubdtype(fill_fields.dtype, np.datetime64):
+                mask = np.isnat(fill_fields)
+                if mask.any():
+                    if fill_fields.ndim > 0:
+                        fill_fields[mask] = 0
+                    else:
+                        parent[0][parent[1]] = 0
+        else:
+            # print(fill_fields.dtype.names)
+            for n in fill_fields.dtype.names:
                 _change_datetime_nat(fill_fields[n], parent=(fill_fields, n))
-
-

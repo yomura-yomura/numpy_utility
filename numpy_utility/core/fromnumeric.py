@@ -233,7 +233,7 @@ def flatten_structured_array(a, sep="/", flatten_2d=False):
     return from_dict(d)
 
 
-def groupby(a, by, *other_by, without_masked=True):
+def groupby(a, by, *other_by, without_masked=True, iter_with=None, sort=False):
     assert is_array(a)
 
     def get_boolean_groupby(a, by, *other_by, without_masked=True):
@@ -248,27 +248,43 @@ def groupby(a, by, *other_by, without_masked=True):
             else:
                 a_by = a[by]
 
-            unique_keys = np.unique(a_by, axis=0)
+            if sort:
+                unique_keys = np.unique(a_by, axis=0)
+            else:
+                unique_keys, indices = np.unique(a_by, return_index=True, axis=0)
+                unique_keys = unique_keys[np.argsort(indices)]
+
             get_boolean_groupby.len = len(unique_keys)
-            return len(unique_keys), ((key, np.isin(a[by], key)) for key in unique_keys)
+            return unique_keys, a[by]
+            # return len(unique_keys), ((key, np.isin(a[by], key)) for key in unique_keys)
         else:
             return get_boolean_groupby(a[by], *other_by, without_masked=without_masked)
 
     class GroupBy:
-        def __init__(self, length, generator):
-            self.len = length
-            self.generator = generator
+        def __init__(self, unique_keys, matched_columns, iter_with=None):
+            self.unique_keys = unique_keys
+            self.matched_columns = matched_columns
+            self.iter_with = iter_with
+            if iter_with is not None:
+                assert builtins.all(len(item) == len(a) for item in iter_with)
 
         def __iter__(self):
-            return (
-                (key, a[boolean_array].data if isinstance(a, np.ma.MaskedArray) and without_masked else a[boolean_array])
-                for key, boolean_array in self.generator
-            )
+            g = ((key, np.isin(self.matched_columns, key)) for key in self.unique_keys)
+            if self.iter_with is None:
+                return (
+                    (key, a[boolean_array])
+                    for key, boolean_array in g
+                )
+            else:
+                return (
+                    (key, a[boolean_array], *(item[boolean_array] for item in self.iter_with))
+                    for key, boolean_array in g
+                )
 
         def __len__(self):
-            return self.len
+            return len(self.unique_keys)
 
-    return GroupBy(*get_boolean_groupby(a, by, *other_by, without_masked=without_masked))
+    return GroupBy(*get_boolean_groupby(a, by, *other_by, without_masked=without_masked), iter_with)
 
 
 def _along_column(func, a):
