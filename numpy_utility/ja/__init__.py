@@ -16,6 +16,7 @@ def _estimate_type(a):
 
 
 def ndim(a):
+    a = np.array(a, dtype=object)
     if np.ndim(a) == 0:
         return 0
     elif np.ndim(a) == 1 and (len(a) == 0 or any(np.ndim(ia) == 0 for ia in a)):
@@ -28,17 +29,20 @@ def flatten(a, max_depth=-1):
     """
     extended for jagged array
     """
+
+    ndim_a = ndim(a)
     if max_depth < 0:
-        max_depth = ndim(a) + max_depth + 1
+        max_depth = ndim_a + max_depth + 1
         assert 0 <= max_depth
-    elif max_depth > ndim(a):
-        max_depth = ndim(a)
+    elif max_depth > ndim_a:
+        max_depth = ndim_a
         # raise ValueError(f"max_depth={max_depth} > ndim={ndim(a)}")
 
     if max_depth == 0:
         return [a]
 
-    if np.ndim(a) == 0:
+    # if np.ndim(a) == 0:
+    if ndim_a == 0:
         return [a]
     else:
         return [iia for ia in a for iia in flatten(ia, max_depth - 1)]
@@ -57,10 +61,10 @@ def apply(func, a, depth=-1, keepdims=True):
     if depth < 0:
         depth = ndim(a) + depth + 1
 
-    applied_flatten_a = np.array([func(ia) for ia in flatten(a, max_depth=depth)])
+    applied_flatten_a = np.array([func(ia) for ia in flatten(a, max_depth=depth)], dtype=object)
 
     if keepdims:
-        new_shape = (*np.shape(a)[:depth], *applied_flatten_a.shape[1:])
+        new_shape = (*np.shape(np.asarray(a, dtype=object))[:depth], *applied_flatten_a.shape[1:])
         if np.prod(new_shape) == applied_flatten_a.size:
             return applied_flatten_a.reshape(new_shape)
     return applied_flatten_a
