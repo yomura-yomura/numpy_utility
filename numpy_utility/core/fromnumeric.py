@@ -17,6 +17,7 @@ __all__ = [
     "from_dict",
     "reshape",
     "flatten_structured_array",
+    "groupby_given",
     "groupby",
     "any",
     "all",
@@ -81,7 +82,10 @@ def add_new_field_to(a, new_field, filled=None, insert_to=None):
             raise ValueError("filled is None")
         if not isinstance(filled, np.ma.MaskedArray):
             filled = np.asarray(filled)
-        return add_new_field_to(a, [(new_field, filled.dtype.descr)], filled)
+        if filled.dtype.names is None:
+            return add_new_field_to(a, (new_field, *filled.dtype.descr[0][1:]), filled, insert_to)
+        else:
+            return add_new_field_to(a, [(new_field, filled.dtype.descr)], filled, insert_to)
     else:
         raise ValueError(new_field)
 
@@ -233,35 +237,9 @@ def flatten_structured_array(a, sep="/", flatten_2d=False):
     return from_dict(d)
 
 
-def groupby(a, by, *other_by, without_masked=True, iter_with=None, sort=False):
-    assert is_array(a)
-
-    def get_boolean_groupby(a, by, *other_by, without_masked=True):
-        if len(other_by) == 0:
-            if isinstance(a, np.ma.MaskedArray) and without_masked:
-                if len(by) == 1:
-                    a_by = a[by].compressed()
-                elif len(by) > 1:
-                    a_by = a[by].data[~any(a[by].mask, axis="column")]
-                else:
-                    raise ValueError("len(by) >= 1")
-            else:
-                a_by = a[by]
-
-            if sort:
-                unique_keys = np.unique(a_by, axis=0)
-            else:
-                unique_keys, indices = np.unique(a_by, return_index=True, axis=0)
-                unique_keys = unique_keys[np.argsort(indices)]
-
-            get_boolean_groupby.len = len(unique_keys)
-            return unique_keys, a[by]
-            # return len(unique_keys), ((key, np.isin(a[by], key)) for key in unique_keys)
-        else:
-            return get_boolean_groupby(a[by], *other_by, without_masked=without_masked)
-
-    class GroupBy:
-        def __init__(self, unique_keys, matched_columns, iter_with=None):
+class GroupBy:
+        def __init__(self, a, unique_keys, matched_columns, iter_with=None):
+            self.a = a
             self.unique_keys = unique_keys
             self.matched_columns = matched_columns
             self.iter_with = iter_with
@@ -272,19 +250,56 @@ def groupby(a, by, *other_by, without_masked=True, iter_with=None, sort=False):
             g = ((key, np.isin(self.matched_columns, key)) for key in self.unique_keys)
             if self.iter_with is None:
                 return (
-                    (key, a[boolean_array])
+                    (key, self.a[boolean_array])
                     for key, boolean_array in g
                 )
             else:
                 return (
-                    (key, a[boolean_array], *(item[boolean_array] for item in self.iter_with))
+                    (key, self.a[boolean_array], *(item[boolean_array] for item in self.iter_with))
                     for key, boolean_array in g
                 )
 
         def __len__(self):
             return len(self.unique_keys)
 
-    return GroupBy(*get_boolean_groupby(a, by, *other_by, without_masked=without_masked), iter_with)
+
+def groupby_given(a, by_given, sort=False):
+    assert is_array(a)
+    assert is_array(by_given)
+
+    if sort:
+        unique_keys = np.unique(by_given, axis=0)
+    else:
+        unique_keys, indices = np.unique(by_given, return_index=True, axis=0)
+        unique_keys = unique_keys[np.argsort(indices)]
+
+    return GroupBy(a, unique_keys, by_given)
+
+
+def groupby(a, by, *nested_by, without_masked=True, iter_with=None, sort=False):
+    assert is_array(a)
+
+    def get_boolean_groupby(a, by, *nested_by, without_masked=True):
+        if len(nested_by) == 0:
+            if isinstance(a, np.ma.MaskedArray) and without_masked:
+                if is_array(by):
+                    a_by = a[by].data[~any(a[by].mask, axis="column")]
+                else:
+                    a_by = a[by].compressed()
+            else:
+                a_by = a[by]
+
+            if sort:
+                unique_keys = np.unique(a_by, axis=0)
+            else:
+                unique_keys, indices = np.unique(a_by, return_index=True, axis=0)
+                unique_keys = unique_keys[np.argsort(indices)]
+
+            return unique_keys, a[by]
+        else:
+            return get_boolean_groupby(a[by], *nested_by, without_masked=without_masked)
+
+    return GroupBy(a, *get_boolean_groupby(a, by, *nested_by, without_masked=without_masked), iter_with)
 
 
 def _along_column(func, a):

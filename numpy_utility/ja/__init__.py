@@ -100,7 +100,6 @@ def from_jagged_array(pylist, horizontal_size=-1, dtype=None, axis=-1):
 
     a = np.ma.empty(mask.shape, dtype)
     a[~mask] = flatten_pylist
-
     a.mask = mask
 
     if 0 < horizontal_size < lens_max:

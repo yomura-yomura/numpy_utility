@@ -1,8 +1,10 @@
 import numpy as np
+from .. import ja
 
 __all__ = [
     "savez",
-    "load"
+    "load",
+    "loadtxt"
 ]
 
 suffix_for_masked_array = "_mask_"
@@ -76,3 +78,45 @@ def load(file, *args, **kwargs):
 
     return ret_data
 
+
+def loadtxt(fname, dtype=float, comments='#', delimiter=None,
+            converters=None, skiprows=0, usecols=None, unpack=False,
+            ndmin=0, encoding='bytes', max_rows=None):
+    """
+    Can load a file with different number of columns.
+
+    returns MaskedArray
+    """
+
+    assert converters is None
+    assert usecols is None
+    assert unpack is False
+    assert ndmin == 0
+    assert encoding == 'bytes'
+
+    if delimiter is not None:
+        delimiter = delimiter.encode()
+
+    comments = comments.encode()
+
+    dtype = np.dtype(dtype)
+
+    with open(fname, "rb") as f:
+        a = ja.from_jagged_array(
+            [line.split(delimiter) for i, line in enumerate(f)
+             if ((skiprows <= i) & ((max_rows is None) or (i <= max_rows)) &
+                 (not line.startswith(comments)))],
+            dtype=dtype if dtype.names is None else None
+        )
+
+    if dtype.names is not None:
+        struct_a = np.ma.empty(a.shape[:-1], dtype)
+        if len(dtype.names) != a.shape[-1]:
+            raise ValueError("given dtype has different size of fields")
+
+        for k, iter_a in zip(dtype.names, np.rollaxis(a, axis=-1)):
+            struct_a[k][~iter_a.mask] = iter_a.compressed()
+            struct_a[k].mask = iter_a.mask
+        return struct_a
+
+    return a

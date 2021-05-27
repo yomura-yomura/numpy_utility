@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='numpy_utility',
-    version='1.8.2',
+    version='1.8.3',
     description='',
     author='yomura',
     author_email='yomura@hoge.jp',

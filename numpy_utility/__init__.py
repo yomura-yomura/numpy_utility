@@ -6,6 +6,7 @@ from . import omr
 from . import char
 from . import ja
 from . import linalg
+from . import bugfix
 from .core import *
 from .io import *
 from .lib import *

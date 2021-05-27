@@ -9,6 +9,7 @@ n_bins_limit = 10000
 
 
 def histogram_bin_centers(bins):
+    bins = np.asarray(bins)
     if np.issubdtype(bins.dtype, np.datetime64):
         time_unit = np.datetime_data(bins.dtype)[0]
         return histogram_bin_centers(bins.astype(int)).astype(f"datetime64[{time_unit}]")
@@ -21,6 +22,7 @@ def histogram_bin_centers(bins):
 
 
 def histogram_bin_widths(bins):
+    bins = np.asarray(bins)
     if np.issubdtype(bins.dtype, np.datetime64):
         bins = bins.astype(int)
     elif np.issubdtype(bins.dtype, np.bool_) or np.issubdtype(bins.dtype, np.str_):
@@ -28,7 +30,7 @@ def histogram_bin_widths(bins):
     elif is_numeric(bins):
         pass
     else:
-        raise NotImplementedError
+        raise TypeError(f"Unexpected type: {bins.dtype}")
     return bins[1:] - bins[:-1]
 
 

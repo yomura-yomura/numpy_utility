@@ -30,7 +30,7 @@ def join(sep, seq, axis=None):
         divided = np.rollaxis(seq, axis=axis)
 
     return functools.reduce(
-        lambda a, b: np.char.rstrip(np.char.add(a, b), sep),
+        lambda a, b: np.char.add(a, b),
         more_itertools.roundrobin(divided, itertools.repeat(sep, len(divided) - 1))
     )
 
