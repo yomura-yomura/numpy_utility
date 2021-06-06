@@ -47,36 +47,68 @@ def savez(file, *args, **kwargs):
     np.savez(file, **kwargs)
 
 
+class NpzFile:
+    def __init__(self, file, mmap_mode, allow_pickle, fix_imports, encoding):
+        self._data = np.load(file, mmap_mode, allow_pickle, fix_imports, encoding)
+
+    def keys(self):
+        keys = [k for k in self._data.keys() if not k.startswith(suffix_for_masked_array)]
+        possible_mask_keys = [f"{suffix_for_masked_array}{k}" for k in keys]
+
+        other_keys_start_with_suffix = [
+            k for k in self._data.keys()
+            if k.startswith(suffix_for_masked_array) and k not in possible_mask_keys
+        ]
+        if len(other_keys_start_with_suffix) > 0:
+            raise NotImplementedError
+
+        return tuple(keys)
+
+    def values(self):
+        return tuple(self[k] for k in self.keys())
+
+    def __iter__(self):
+        return self.keys()
+
+    def __getitem__(self, key):
+        a = self._data[key]
+        mask_key = f"{suffix_for_masked_array}{key}"
+        if mask_key in self._data.keys():
+            return np.ma.MaskedArray(a, mask=self._data[mask_key])
+        return a
+
+
 @np.core.overrides.set_module("numpy_utility")
-def load(file, *args, **kwargs):
-    data = np.load(file, *args, **kwargs)
-
-    masked_array_keys = [
-        k[len(suffix_for_masked_array):]
-        for k in data.keys()
-        if k.startswith(suffix_for_masked_array)
-    ]
-
-    other_keys = [
-        k
-        for k in data.keys()
-        if not k.startswith(suffix_for_masked_array)
-        if k not in masked_array_keys
-    ]
-
-    # MaskedArray
-    ret_data = {
-        k: np.ma.MaskedArray(data[k], data[suffix_for_masked_array + k])
-        for k in masked_array_keys
-    }
-
-    # Others
-    ret_data.update({
-        k: data[k]
-        for k in other_keys
-    })
-
-    return ret_data
+def load(file, mmap_mode=None, allow_pickle=False, fix_imports=True, encoding='ASCII'):
+    return NpzFile(file, mmap_mode, allow_pickle, fix_imports, encoding)
+    # data = np.load(file, mmap_mode, allow_pickle, fix_imports, encoding)
+    #
+    # masked_array_keys = [
+    #     k[len(suffix_for_masked_array):]
+    #     for k in data.keys()
+    #     if k.startswith(suffix_for_masked_array)
+    # ]
+    #
+    # other_keys = [
+    #     k
+    #     for k in data.keys()
+    #     if not k.startswith(suffix_for_masked_array)
+    #     if k not in masked_array_keys
+    # ]
+    #
+    # # MaskedArray
+    # ret_data = {
+    #     k: np.ma.MaskedArray(data[k], data[suffix_for_masked_array + k])
+    #     for k in masked_array_keys
+    # }
+    #
+    # # Others
+    # ret_data.update({
+    #     k: data[k]
+    #     for k in other_keys
+    # })
+    #
+    # return ret_data
 
 
 def loadtxt(fname, dtype=float, comments='#', delimiter=None,

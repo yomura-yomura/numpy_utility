@@ -92,8 +92,9 @@ def histogram(a, bins=10, range=None, weights=None, density=None):
         bins = np.min(a) + bins.astype(f"timedelta64[{time_unit}]")
     elif np.issubdtype(a.dtype, np.bool_) or np.issubdtype(a.dtype, np.str_):
         x, y = np.unique(a, return_counts=True)
-        counts = np.array([0] * len(bins))
-        counts[bins == x] = y
+        counts = np.zeros(len(bins), dtype="i8")
+        # print(bins, x.shape, bins.shape)
+        counts[np.isin(bins, x)] = y
 
         if density is True:
             counts = counts / np.sum(counts)

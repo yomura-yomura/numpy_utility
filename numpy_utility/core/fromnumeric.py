@@ -129,7 +129,13 @@ def search_matched(a, v):
         assert np.any(np.unique(v, return_counts=True)[1] > 1)
         raise ValueError("duplicate values found in a")
 
-    return sorted_indices.take(indices[spans == 1])
+    if indices.ndim == 0:
+        if spans == 1:
+            return sorted_indices[indices]
+        else:
+            return np.array([], dtype=np.int64)
+    else:
+        return sorted_indices.take(indices[spans == 1])
 
 
 # Maybe should be in a file _multiarray_umath.py
