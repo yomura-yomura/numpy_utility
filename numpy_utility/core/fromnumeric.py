@@ -21,16 +21,19 @@ __all__ = [
     "groupby",
     "any",
     "all",
-    "sum"
+    "sum",
+    "is_sorted"
 ]
 
 
 def get_array_matched_with_boolean_array(a, boolean_array, remove_all_masked_rows=False):
     assert(1 <= boolean_array.ndim <= 2)
-    assert(a.size == boolean_array.shape[-1])
+    # assert(a.size == boolean_array.shape[-1])
+    a, boolean_array = np.broadcast_arrays(a, boolean_array)
 
     new_array = np.ma.empty(boolean_array.shape, dtype=a.dtype)
-    new_array[boolean_array] = a[np.where(boolean_array)[-1]]
+    # new_array[boolean_array] = a[np.where(boolean_array)[-1]]
+    new_array[boolean_array] = a[boolean_array]
     new_array.mask = ~boolean_array
 
     if remove_all_masked_rows:
@@ -244,32 +247,53 @@ def flatten_structured_array(a, sep="/", flatten_2d=False):
 
 
 class GroupBy:
-        def __init__(self, a, unique_keys, matched_columns, iter_with=None):
-            self.a = a
-            self.unique_keys = unique_keys
-            self.matched_columns = matched_columns
-            self.iter_with = iter_with
-            if iter_with is not None:
-                assert builtins.all(len(item) == len(a) for item in iter_with)
+    def __init__(self, a, unique_keys, sort_by, iter_with=None):
+        self.a = a
+        self.sort_by = sort_by
+        self.a_sorter = np.argsort(self.sort_by)
 
-        def __iter__(self):
-            g = ((key, np.isin(self.matched_columns, key)) for key in self.unique_keys)
-            if self.iter_with is None:
-                return (
-                    (key, self.a[boolean_array])
-                    for key, boolean_array in g
-                )
-            else:
-                return (
-                    (key, self.a[boolean_array], *(item[boolean_array] for item in self.iter_with))
-                    for key, boolean_array in g
-                )
+        unique_keys_sorter = np.argsort(unique_keys)
+        self.sorted_unique_keys = unique_keys[unique_keys_sorter]
+        self.unique_keys_unsorter = np.argsort(unique_keys_sorter)
 
-        def __len__(self):
-            return len(self.unique_keys)
+        edges_matched_in_sorted_a = np.append(
+            np.searchsorted(self.sort_by, self.sorted_unique_keys, sorter=self.a_sorter),
+            a.size
+        )
+        self.left_edges_matched_in_sorted_a = edges_matched_in_sorted_a[:-1]
+        self.right_edges_matched_in_sorted_a = edges_matched_in_sorted_a[1:]
+
+        self.iter_with = iter_with
+        if iter_with is not None:
+            assert builtins.all(len(item) == len(a) for item in iter_with)
+
+    def __iter__(self):
+        # g = ((key, np.isin(self.field_names_to_sort_by, key)) for key in self.unique_keys)
+        # assert is_sorted(self.edges_matched_in_sorted_a)
+        g = (
+            (
+                self.sorted_unique_keys[i],
+                self.a_sorter[self.left_edges_matched_in_sorted_a[i]:self.right_edges_matched_in_sorted_a[i]]
+            )
+            for i in self.unique_keys_unsorter
+        )
+
+        if self.iter_with is None:
+            return (
+                (key, self.a[boolean_array])
+                for key, boolean_array in g
+            )
+        else:
+            return (
+                (key, self.a[boolean_array], *(item[boolean_array] for item in self.iter_with))
+                for key, boolean_array in g
+            )
+
+    def __len__(self):
+        return len(self.sorted_unique_keys)
 
 
-def groupby_given(a, by_given, sort=False):
+def groupby_given(a, by_given, iter_with=None, sort=False):
     assert is_array(a)
     assert is_array(by_given)
 
@@ -279,7 +303,7 @@ def groupby_given(a, by_given, sort=False):
         unique_keys, indices = np.unique(by_given, return_index=True, axis=0)
         unique_keys = unique_keys[np.argsort(indices)]
 
-    return GroupBy(a, unique_keys, by_given)
+    return GroupBy(a, unique_keys, by_given, iter_with)
 
 
 def groupby(a, by, *nested_by, without_masked=True, iter_with=None, sort=False):
@@ -354,3 +378,9 @@ def sum(a, axis=None, dtype=None, out=None, keepdims=np._NoValue,
     if np.issubdtype(ret.dtype, np.object_):
         raise NotImplementedError("type of returned is object")
     return ret
+
+
+def is_sorted(a):
+    if isinstance(a, np.ma.MaskedArray):
+        a = a.compressed()
+    return builtins.all(i == i_order for i, i_order in enumerate(np.argsort(a)))

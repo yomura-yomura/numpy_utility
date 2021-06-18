@@ -5,7 +5,7 @@ from ..core import is_array
 import numpy as np
 
 
-__all__ = ["ndim", "flatten", "apply", "from_jagged_array"]
+__all__ = ["ndim", "flatten", "apply", "from_jagged_array", "reshape"]
 
 
 def _estimate_type(a):
@@ -106,3 +106,16 @@ def from_jagged_array(pylist, horizontal_size=-1, dtype=None, axis=-1):
         return a[..., :horizontal_size]
 
     return a
+
+
+def reshape(a, newshape):
+    if np.ma.isMaskedArray(a):
+        new_a = reshape(a.data, newshape)
+        new_a.mask |= reshape(a.mask, newshape)
+    else:
+        a = np.asarray(a)
+        new_a = np.ma.empty(newshape, dtype=a.dtype)
+        mask = np.arange(np.prod(newshape)).reshape(newshape) >= len(a)
+        new_a[~mask] = a
+        new_a.mask = mask
+    return new_a
