@@ -1,5 +1,7 @@
 import numpy as np
 from .. import ja
+from .. import core
+
 
 __all__ = [
     "savez",
@@ -149,6 +151,13 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
         for k, iter_a in zip(dtype.names, np.rollaxis(a, axis=-1)):
             struct_a[k][~iter_a.mask] = iter_a.compressed()
             struct_a[k].mask = iter_a.mask
-        return struct_a
 
-    return a
+        use_mask = np.any(core.any(struct_a, axis="column"))
+        a = struct_a
+    else:
+        use_mask = np.any(a.mask)
+
+    if use_mask:
+        return a
+    else:
+        return a.data

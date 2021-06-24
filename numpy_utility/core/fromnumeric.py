@@ -2,7 +2,7 @@ import numpy as np
 import numpy.lib.recfunctions
 from ..core import is_integer
 import builtins
-import warnings
+from collections.abc import Iterable
 
 
 __all__ = [
@@ -22,7 +22,8 @@ __all__ = [
     "any",
     "all",
     "sum",
-    "is_sorted"
+    "is_sorted",
+    "to_tidy_data"
 ]
 
 
@@ -94,14 +95,9 @@ def add_new_field_to(a, new_field, filled=None, insert_to=None):
 
 
 def remove_field_from(a, field):
-    if is_array(field):
-        return get_new_array_with_field_names(
-            a, [field_name for field_name, *_ in a.dtype.descr if field_name not in field]
-        )
-    else:
-        return get_new_array_with_field_names(
-            a, [field_name for field_name, *_ in a.dtype.descr if field_name != field]
-        )
+    return get_new_array_with_field_names(
+        a, [field_name for field_name, *_ in a.dtype.descr if not np.isin(field_name, field).any()]
+    )
 
 
 def change_field_format_to(a, new_field_format):
@@ -384,3 +380,44 @@ def is_sorted(a):
     if isinstance(a, np.ma.MaskedArray):
         a = a.compressed()
     return builtins.all(i == i_order for i, i_order in enumerate(np.argsort(a)))
+
+
+def to_tidy_data(dict_obj: dict, new_level_name="level_0", field_names=None):
+    if field_names is not None and not is_array(field_names):
+        field_names = [field_names]
+
+    def to_ndarray(obj):
+        if isinstance(obj, np.ndarray):
+            return obj
+        elif is_array(obj):
+            obj = np.array(obj)
+        elif isinstance(obj, Iterable):
+            obj = list(obj)
+        else:
+            raise TypeError(type(obj))
+        return to_ndarray(obj)
+
+    dict_obj = {k: to_ndarray(v) for k, v in dict_obj.items()}
+
+    shapes = [v.shape[1:] for v in dict_obj.values()]
+    assert builtins.all(shapes[0] == shape for shape in shapes[1:])
+    value_shape = shapes[0]
+    assert len(value_shape) in (0, 1)
+
+    if field_names is None:
+        if len(value_shape) == 0:
+            field_names = ("0",)
+        else:
+            field_names = tuple(str(i) for i in range(value_shape[0]))
+
+    dtypes = [v.dtype for v in dict_obj.values()]
+    if not builtins.all(dtypes[0].kind == dtype.kind for dtype in dtypes[1:]):
+        raise TypeError("different dtypes found in dict_obj")
+    value_dtype = max(dtypes, key=lambda dtype: dtype.itemsize)
+    key_dtype = np.array(list(dict_obj.keys())).dtype
+
+    return np.array([
+        (k, *([iv] if iv.ndim == 0 else iv))
+        for k, v in dict_obj.items()
+        for iv in v
+    ], dtype=[(new_level_name, key_dtype), *((fn, value_dtype) for fn in field_names)])
