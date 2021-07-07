@@ -1,3 +1,5 @@
+import inspect
+
 import numpy as np
 import functools
 import itertools
@@ -6,7 +8,8 @@ from ..core import from_dict
 
 __all__ = [
     "is_structured_array",
-    "merge_arrays"
+    "merge_arrays",
+    "for_masked_array"
 ]
 
 
@@ -42,4 +45,28 @@ def merge_arrays(arrays):
 
     return from_dict(dict(raw_dict))
 
+
+def for_masked_array(func):
+    parameter_names = list(inspect.signature(func).parameters.keys())
+    first_param_name = parameter_names[0]
+
+    @functools.wraps(func)
+    def _inner(*args, **kwargs):
+        if len(args) > 0:
+            first_arg = args[0]
+            args = args[1:]
+        elif first_param_name in kwargs:
+            first_arg = kwargs.pop(first_param_name)
+        else:
+            raise RuntimeWarning("invalid structure of func")
+
+        if np.ma.isMaskedArray(first_arg):
+            ret = func(first_arg.compressed(), *args, **kwargs)
+            a = np.ma.empty(len(first_arg), dtype=np.asarray(ret).dtype)
+            a.mask = True
+            a[~first_arg.mask] = ret
+        else:
+            a = func(first_arg, *args, **kwargs)
+        return a
+    return _inner
 

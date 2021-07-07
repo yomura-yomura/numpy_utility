@@ -23,7 +23,8 @@ __all__ = [
     "all",
     "sum",
     "is_sorted",
-    "to_tidy_data"
+    "to_tidy_data",
+    # "fields_view"
 ]
 
 
@@ -138,16 +139,16 @@ def search_matched(a, v):
 
 
 # Maybe should be in a file _multiarray_umath.py
-def from_dict(data, strict=True, use_common_dims=True):
+def from_dict(data, strict=True, use_common_shape=True):
     if isinstance(data, dict):
-        new_array = [from_dict(v, strict, use_common_dims) for v in data.values()]
+        new_array = [from_dict(v, strict, use_common_shape) for v in data.values()]
         masked_found = builtins.any(isinstance(na, np.ma.MaskedArray) for na in new_array)
-    elif isinstance(data, np.ndarray):
+    elif isinstance(data, np.ma.MaskedArray):
         return data
     else:
-        return np.array(data)
+        return np.asarray(data)
 
-    if use_common_dims:
+    if use_common_shape:
         max_ndim = min(v.ndim for v in new_array)
         ndim_start = np.count_nonzero([
             len(np.unique([v.shape[:i] for v in new_array], axis=0)) == 1 for i in range(1, max_ndim + 1)
@@ -161,9 +162,10 @@ def from_dict(data, strict=True, use_common_dims=True):
             flatten_ret = from_dict({
                 k: v.flatten() if v.ndim <= ndim_start else v.reshape((-1, *v.shape[ndim_start:]))
                 for k, v in data.items()
-            }, strict, use_common_dims)
+            }, strict, use_common_shape)
             return flatten_ret.reshape(common_shape)
     else:
+        common_shape = ()
         ndim_start = 0
 
     def get_dtype(a):
@@ -176,8 +178,15 @@ def from_dict(data, strict=True, use_common_dims=True):
     new_dtype = [(k, *get_dtype(na)) for k, na in zip(data.keys(), new_array)]
 
     if strict is True:
-        if not builtins.all(len(new_array[0]) == len(na) for na in new_array[1:]):
-            raise ValueError(f"Mismatch length between {data.keys()}")
+        shapes = [na.shape[:-len(common_shape)] for na in new_array]
+        if not builtins.all(shapes[0] == shape for shape in shapes):
+            raise ValueError(
+                "\n".join([
+                    f"Mismatch length:",
+                    "\t Key, Shape",
+                    *(f"\t {k}, {shape}" for k, shape in zip(data.keys(), shapes))
+                ])
+            )
 
     if masked_found:
         from .. import bugfix
@@ -188,7 +197,21 @@ def from_dict(data, strict=True, use_common_dims=True):
         bugfix.np_ma_nat_fill_value.fix(ret)
         return ret
     else:
-        return np.array(list(zip(*new_array)), new_dtype)
+        # print(new_array)
+        # return np.array(list(zip(*new_array)), new_dtype)
+        # def to_tuple(a):
+        #     return [
+        #         tuple(to_tuple(ia)) if ia.ndim > 0 else ia
+        #         for ia in a
+        #     ]
+        # return new_array, new_dtype
+        # print(new_array)
+        # print(new_dtype)
+        # print(common_shape)
+        if len(common_shape) == 0:
+            return np.array([tuple(new_array)], new_dtype)
+        else:
+            return np.array(list(zip(*new_array)), new_dtype)
 
 
 def reshape(a, newshape, drop=True):
@@ -390,7 +413,17 @@ def to_tidy_data(dict_obj: dict, new_level_name="level_0", field_names=None):
         if isinstance(obj, np.ndarray):
             return obj
         elif is_array(obj):
-            obj = np.array(obj)
+            from .. import ja
+            ndim = ja.ndim(obj)
+            if ndim == 1:
+                obj = np.array(obj)
+            elif ndim == 2:
+                obj = np.array(obj, dtype="O")
+                dtypes = [np.array(col.tolist()).dtype for col in np.rollaxis(obj, axis=1)]
+                names = [f"f{i}" for i in range(len(dtypes))]
+                obj = np.array(list(map(tuple, obj)), list(zip(names, dtypes)))
+            else:
+                raise NotImplementedError
         elif isinstance(obj, Iterable):
             obj = list(obj)
         else:
@@ -404,20 +437,76 @@ def to_tidy_data(dict_obj: dict, new_level_name="level_0", field_names=None):
     value_shape = shapes[0]
     assert len(value_shape) in (0, 1)
 
+    value_dtype_field_names_list = [v.dtype.names for v in dict_obj.values()]
+    assert builtins.all(value_dtype_field_names_list[0] == field_name for field_name in value_dtype_field_names_list[1:])
+    value_dtype_field_names = value_dtype_field_names_list[0]
+    
+    is_multi_columns = len(value_shape) != 0 or value_dtype_field_names is not None
+    assert not (len(value_shape) != 0 and value_dtype_field_names is not None)
+
     if field_names is None:
-        if len(value_shape) == 0:
-            field_names = ("0",)
+        if is_multi_columns:
+            n_var = value_shape[0] if len(value_shape) != 0 else len(value_dtype_field_names)
+            field_names = tuple(str(i) for i in range(n_var))
         else:
-            field_names = tuple(str(i) for i in range(value_shape[0]))
+            field_names = ("0",)
 
-    dtypes = [v.dtype for v in dict_obj.values()]
-    if not builtins.all(dtypes[0].kind == dtype.kind for dtype in dtypes[1:]):
-        raise TypeError("different dtypes found in dict_obj")
-    value_dtype = max(dtypes, key=lambda dtype: dtype.itemsize)
     key_dtype = np.array(list(dict_obj.keys())).dtype
+    value_dtypes = [v.dtype for v in dict_obj.values()]
 
-    return np.array([
-        (k, *([iv] if iv.ndim == 0 else iv))
-        for k, v in dict_obj.items()
-        for iv in v
-    ], dtype=[(new_level_name, key_dtype), *((fn, value_dtype) for fn in field_names)])
+    def get_common_dtype(value_dtypes):
+        if not builtins.all(value_dtypes[0].kind == v_dtype.kind for v_dtype in value_dtypes[1:]):
+            raise TypeError("different dtypes found in dict_obj")
+        value_dtype = max(value_dtypes, key=lambda dtype: dtype.itemsize)
+        return value_dtype
+
+    if value_dtype_field_names is not None:
+        value_dtypes = [
+            get_common_dtype([v_dtype[field_name] for v_dtype in value_dtypes])
+            for field_name in value_dtype_field_names
+        ]
+        dtype = [(new_level_name, key_dtype), *((fn, v_dtype) for fn, v_dtype in zip(field_names, value_dtypes))]
+    else:
+        v_dtype = get_common_dtype(value_dtypes)
+        dtype = [(new_level_name, key_dtype), *((fn, v_dtype) for fn in field_names)]
+
+    if is_multi_columns:
+        return np.array([(k, *iv) for k, v in dict_obj.items() for iv in v], dtype)
+    else:
+        return np.array([(k, iv) for k, v in dict_obj.items() for iv in v], dtype)
+
+
+# def fields_view(arr, *field_names):
+#     if np.ma.isMaskedArray(arr):
+#         # mask and fill_value seem to be copies.
+#         return np.ma.MaskedArray(
+#             data=fields_view(arr.data, *field_names),
+#             mask=fields_view(arr.mask, *field_names),
+#             fill_value=fields_view(arr.fill_value, *field_names),
+#             hard_mask=True
+#         )
+#
+#     def get_dtype(dtype_fields, nested_field_names):
+#         if is_array(nested_field_names):
+#             if len(nested_field_names) == 0:
+#                 raise ValueError("Unknown field_names format")
+#             elif len(nested_field_names) == 1:
+#                 return get_dtype(dtype_fields, nested_field_names[0])
+#             else:
+#                 next_dtype, *other_dtypes = nested_field_names
+#                 dtype, offset = dtype_fields[next_dtype]
+#                 next_dtype, next_offset = get_dtype(dtype.fields, other_dtypes)
+#                 return next_dtype, offset + next_offset
+#                 # return next_dtype, next_offset
+#         else:
+#             return dtype_fields[nested_field_names]
+#
+#     sep = "/"
+#
+#     dtype2 = np.dtype({
+#         sep.join(nested_names): get_dtype(arr.dtype.fields, nested_names)
+#         for nested_names in (e if is_array(e) else [e] for e in field_names)
+#     })
+#     print(dtype2)
+#     return arr.getfield(dtype2)
+#     # return np.ndarray(arr.shape, dtype2, arr, 0, arr.strides)

@@ -123,7 +123,7 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
     """
 
     assert converters is None
-    assert usecols is None
+    # assert usecols is None
     assert unpack is False
     assert ndmin == 0
     assert encoding == 'bytes'
@@ -135,9 +135,16 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
 
     dtype = np.dtype(dtype)
 
+    if usecols is None:
+        def _line_split(line):
+            return line.split(delimiter)
+    else:
+        def _line_split(line):
+            return [e for i, e in enumerate(line.split(delimiter)) if i in usecols]
+
     with open(fname, "rb") as f:
         a = ja.from_jagged_array(
-            [line.split(delimiter) for i, line in enumerate(f)
+            [_line_split(line) for i, line in enumerate(f)
              if ((skiprows <= i) & ((max_rows is None) or (i <= max_rows)) &
                  (not line.startswith(comments)))],
             dtype=dtype if dtype.names is None else None
