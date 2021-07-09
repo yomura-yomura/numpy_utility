@@ -177,16 +177,16 @@ def from_dict(data, strict=True, use_common_shape=True):
 
     new_dtype = [(k, *get_dtype(na)) for k, na in zip(data.keys(), new_array)]
 
-    if strict is True:
-        shapes = [na.shape[:-len(common_shape)] for na in new_array]
-        if not builtins.all(shapes[0] == shape for shape in shapes):
-            raise ValueError(
-                "\n".join([
-                    f"Mismatch length:",
-                    "\t Key, Shape",
-                    *(f"\t {k}, {shape}" for k, shape in zip(data.keys(), shapes))
-                ])
-            )
+    # if strict is True:
+    #     shapes = [na.shape[:-len(common_shape)] for na in new_array]
+    #     if not builtins.all(shapes[0] == shape for shape in shapes):
+    #         raise ValueError(
+    #             "\n".join([
+    #                 f"Mismatch length:",
+    #                 "\t Key, Shape",
+    #                 *(f"\t {k}, {shape}" for k, shape in zip(data.keys(), shapes))
+    #             ])
+    #         )
 
     if masked_found:
         from .. import bugfix
