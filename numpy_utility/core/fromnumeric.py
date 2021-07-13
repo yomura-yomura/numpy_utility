@@ -139,9 +139,9 @@ def search_matched(a, v):
 
 
 # Maybe should be in a file _multiarray_umath.py
-def from_dict(data, strict=True, use_common_shape=True):
+def from_dict(data, use_dtype_shape=True, use_common_shape=True):
     if isinstance(data, dict):
-        new_array = [from_dict(v, strict, use_common_shape) for v in data.values()]
+        new_array = [from_dict(v, use_dtype_shape, use_common_shape) for v in data.values()]
         masked_found = builtins.any(isinstance(na, np.ma.MaskedArray) for na in new_array)
     elif isinstance(data, np.ma.MaskedArray):
         return data
@@ -149,9 +149,9 @@ def from_dict(data, strict=True, use_common_shape=True):
         return np.asarray(data)
 
     if use_common_shape:
-        max_ndim = min(v.ndim for v in new_array)
+        min_ndim = min(v.ndim for v in new_array)
         ndim_start = np.count_nonzero([
-            len(np.unique([v.shape[:i] for v in new_array], axis=0)) == 1 for i in range(1, max_ndim + 1)
+            len(np.unique([v.shape[:i] for v in new_array], axis=0)) == 1 for i in range(1, min_ndim + 1)
         ])
         if ndim_start > 0:
             common_shape = np.unique([v.shape[:ndim_start] for v in new_array], axis=0)[0]
@@ -162,31 +162,31 @@ def from_dict(data, strict=True, use_common_shape=True):
             flatten_ret = from_dict({
                 k: v.flatten() if v.ndim <= ndim_start else v.reshape((-1, *v.shape[ndim_start:]))
                 for k, v in data.items()
-            }, strict, use_common_shape)
+            }, use_dtype_shape, use_common_shape)
             return flatten_ret.reshape(common_shape)
     else:
         common_shape = ()
-        ndim_start = 0
 
     def get_dtype(a):
         pre_descr = a.dtype.descr[0][1:] if a.dtype.names is None else [a.dtype.descr]
-        if a.ndim <= ndim_start:
+        if len(common_shape) == a.ndim:
             return pre_descr
         else:
-            return (*pre_descr, a.shape[ndim_start:])
+            return (*pre_descr, a.shape[len(common_shape):])
 
     new_dtype = [(k, *get_dtype(na)) for k, na in zip(data.keys(), new_array)]
 
-    # if strict is True:
-    #     shapes = [na.shape[:-len(common_shape)] for na in new_array]
-    #     if not builtins.all(shapes[0] == shape for shape in shapes):
-    #         raise ValueError(
-    #             "\n".join([
-    #                 f"Mismatch length:",
-    #                 "\t Key, Shape",
-    #                 *(f"\t {k}, {shape}" for k, shape in zip(data.keys(), shapes))
-    #             ])
-    #         )
+    if use_dtype_shape == np.False_:
+        max_ndim = max(v.ndim for v in new_array)
+        if len(common_shape) != max_ndim:
+            shapes = [na.shape[len(common_shape):] for na in new_array]
+            raise ValueError(
+                "\n".join([
+                    f"Mismatch length:",
+                    "\t Key, Shape",
+                    *(f"\t {k}, {shape}" for k, shape in zip(data.keys(), shapes))
+                ])
+            )
 
     if masked_found:
         from .. import bugfix
@@ -197,17 +197,6 @@ def from_dict(data, strict=True, use_common_shape=True):
         bugfix.np_ma_nat_fill_value.fix(ret)
         return ret
     else:
-        # print(new_array)
-        # return np.array(list(zip(*new_array)), new_dtype)
-        # def to_tuple(a):
-        #     return [
-        #         tuple(to_tuple(ia)) if ia.ndim > 0 else ia
-        #         for ia in a
-        #     ]
-        # return new_array, new_dtype
-        # print(new_array)
-        # print(new_dtype)
-        # print(common_shape)
         if len(common_shape) == 0:
             return np.array([tuple(new_array)], new_dtype)
         else:
