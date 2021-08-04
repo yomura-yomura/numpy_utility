@@ -422,7 +422,18 @@ def to_tidy_data(dict_obj: dict, new_level_name="level_0", field_names=None):
     dict_obj = {k: to_ndarray(v) for k, v in dict_obj.items()}
 
     shapes = [v.shape[1:] for v in dict_obj.values()]
-    assert builtins.all(shapes[0] == shape for shape in shapes[1:])
+    if not builtins.all(shapes[0] == shape for shape in shapes[1:]):
+        keys = dict_obj.keys()
+        max_len = max(len(k) for k in keys)
+        raise ValueError(
+            "\n".join((
+                "Must have same shape[1:]:",
+                *(
+                    f"\t {k:<{max_len}}: {shape}"
+                    for k, shape in zip(keys, shapes)
+                )
+            ))
+        )
     value_shape = shapes[0]
     assert len(value_shape) in (0, 1)
 
