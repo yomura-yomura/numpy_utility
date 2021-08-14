@@ -1,3 +1,5 @@
+import inspect
+
 import numpy as np
 import numpy.lib.recfunctions
 from ..core import is_integer
@@ -101,14 +103,21 @@ def remove_field_from(a, field):
     )
 
 
-def change_field_format_to(a, new_field_format):
+def change_field_format_to(a, new_field_format: dict, filled=None):
     """
-    new_field_format: dict type: {[field name]: [format]}
+    new_field_format: dict type: {field name: format}
     """
-    new_type = [(k, *sub) if k not in new_field_format.keys() else (k, new_field_format[k], *sub[1:])
-                for k, *sub in a.dtype.descr]
+    new_type = [
+        (k, *sub) if k not in new_field_format.keys() else (k, new_field_format[k], *sub[1:])
+        for k, *sub in a.dtype.descr
+    ]
     new_a = np.empty_like(a, new_type)
-    np.lib.recfunctions.recursive_fill_fields(a, new_a)
+    for k in new_a.dtype.names:
+        if filled is not None and k in filled:
+            new_a[k] = filled[k]
+        else:
+            new_a[k] = a[k]
+    # np.lib.recfunctions.recursive_fill_fields(a, new_a)
     return new_a
 
 
@@ -235,20 +244,24 @@ def reshape(a, newshape, drop=True):
         return a.reshape(newshape)
 
 
-def flatten_structured_array(a, sep="/", flatten_2d=False):
+def flatten_structured_array(a, sep="/", flatten_2d=True):
     if a.dtype.names is None:
-        return a
+        if flatten_2d and a.ndim == 2:
+            return from_dict(dict(zip(map(str, range(a.shape[-1])), np.rollaxis(a, axis=1))))
+        else:
+            return a
+    else:
+        dtype_names = a.dtype.names
 
     d = {}
-    for name in a.dtype.names:
-        if a[name].dtype.names is None:
-            if flatten_2d is True and a[name].ndim == 2:
-                for i in range(a[name].shape[1]):
-                    d[f"{name}{sep}f{i}"] = a[name][:, i]
-            else:
-                d[name] = a[name]
+    for name in dtype_names:
+        # if a[name].dtype.names is None:
+        #     d[name] = a[name]
+        # else:
+        flatten = flatten_structured_array(a[name], sep, flatten_2d)
+        if flatten.dtype.names is None:
+            d[name] = a[name]
         else:
-            flatten = flatten_structured_array(a[name], sep, flatten_2d)
             for k in flatten.dtype.names:
                 d[f"{name}{sep}{k}"] = flatten[k]
     return from_dict(d)
@@ -275,10 +288,8 @@ class GroupBy:
         if iter_with is not None:
             assert builtins.all(len(item) == len(a) for item in iter_with)
 
-    def __iter__(self):
-        # g = ((key, np.isin(self.field_names_to_sort_by, key)) for key in self.unique_keys)
-        # assert is_sorted(self.edges_matched_in_sorted_a)
-        g = (
+    def _generate_key_and_boolean_array(self):
+        return (
             (
                 self.sorted_unique_keys[i],
                 self.a_sorter[self.left_edges_matched_in_sorted_a[i]:self.right_edges_matched_in_sorted_a[i]]
@@ -286,19 +297,32 @@ class GroupBy:
             for i in self.unique_keys_unsorter
         )
 
+    def _get_elements_matched_with(self, key, boolean_array):
         if self.iter_with is None:
-            return (
-                (key, self.a[boolean_array])
-                for key, boolean_array in g
-            )
+            return key, self.a[boolean_array]
         else:
-            return (
-                (key, self.a[boolean_array], *(item[boolean_array] for item in self.iter_with))
-                for key, boolean_array in g
-            )
+            return key, self.a[boolean_array], *(item[boolean_array] for item in self.iter_with)
+
+    def __iter__(self):
+        return (
+            self._get_elements_matched_with(key, boolean_array)
+            for key, boolean_array in self._generate_key_and_boolean_array()
+        )
 
     def __len__(self):
         return len(self.sorted_unique_keys)
+
+    def apply(self, func, dtype=None):
+        return np.array([
+            func(*self._get_elements_matched_with(key, boolean_array))
+            for key, boolean_array in self._generate_key_and_boolean_array()
+        ], dtype)
+
+    def apply_for_each_group(self, func, dtype=None):
+        ret = np.empty(len(self.a), dtype)
+        for key, boolean_array in self._generate_key_and_boolean_array():
+            ret[boolean_array] = func(*self._get_elements_matched_with(key, boolean_array))
+        return ret
 
 
 def groupby_given(a, by_given, iter_with=None, sort=False):
@@ -395,6 +419,15 @@ def is_sorted(a):
 
 
 def to_tidy_data(dict_obj: dict, new_level_name="level_0", field_names=None):
+    if builtins.any(np.ma.isMaskedArray(v) for v in dict_obj.values()):
+        return np.ma.MaskedArray(
+            to_tidy_data({k: np.ma.getdata(v) for k, v in dict_obj.items()}, new_level_name, field_names),
+            change_field_format_to(
+                to_tidy_data({k: np.ma.getmask(v) for k, v in dict_obj.items()}, new_level_name, field_names),
+                {new_level_name: "?"}, {new_level_name: False}
+            )
+        )
+
     if field_names is not None and not is_array(field_names):
         field_names = [field_names]
 
