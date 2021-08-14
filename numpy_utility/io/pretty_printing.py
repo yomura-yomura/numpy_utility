@@ -6,11 +6,15 @@ import datetime as dt
 __all__ = ["print_structured_array"]
 
 
-def _to_dict_as_str(a: np.ndarray):
+def _to_dict_as_str(a: np.ndarray, filled="-"):
     if a.dtype.names is None:
-        return a.astype(str)
+        a = a.astype(str)
+        if np.ma.isMaskedArray(a):
+            return a.filled(filled)
+        else:
+            return a
     else:
-        return {name: _to_dict_as_str(a[name]) for name in a.dtype.names}
+        return {name: _to_dict_as_str(a[name], filled) for name in a.dtype.names}
 
 
 def flatten_nested_dictionary(d: dict):
