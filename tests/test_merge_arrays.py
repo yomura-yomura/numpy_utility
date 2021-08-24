@@ -16,6 +16,11 @@ class MyTestCase(unittest.TestCase):
         a2["index"] = np.arange(10)
         npu.merge_arrays([a1, a2])
 
+    def test3(self):
+        a1 = np.empty((0,), dtype=[("index", "i4"), ("b", "f8")])
+        a2 = np.empty((10,), dtype=[("index", "i8"), ("c", "f8")])
+        npu.merge_arrays([a1, a2])
+
 
 if __name__ == '__main__':
     unittest.main()

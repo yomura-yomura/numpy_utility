@@ -61,15 +61,17 @@ def combine_structured_arrays(a1, a2):
     return add_new_field_to(a1, new_fields, a2)
 
 
-def add_new_field_to(a, new_field, filled=None, insert_to=None):
-    if is_array(new_field):
-        if isinstance(new_field, tuple):
-            new_field = [new_field]
+def add_new_field_to(a, new_fields, filled=None, insert_to=None):
+    if is_array(new_fields):
+        if isinstance(new_fields, tuple):
+            new_fields = [new_fields]
+
         if insert_to is None:
-            new_descr = a.dtype.descr + new_field
+            new_descr = a.dtype.descr + new_fields
         else:
             new_descr = a.dtype.descr.copy()
-            new_descr.insert(insert_to, new_field[0])
+            for new_field in new_fields:
+                new_descr.insert(insert_to, new_field)
 
         if isinstance(a, np.ma.MaskedArray):
             new_a = np.ma.zeros(a.shape, new_descr)
@@ -81,20 +83,20 @@ def add_new_field_to(a, new_field, filled=None, insert_to=None):
         np.lib.recfunctions.recursive_fill_fields(a, new_a)
 
         if filled is not None:
-            for name, *_ in new_field:
+            for name, *_ in new_fields:
                 new_a[name] = filled
         return new_a
-    elif isinstance(new_field, str):
+    elif isinstance(new_fields, str):
         if filled is None:
             raise ValueError("filled is None")
         if not isinstance(filled, np.ma.MaskedArray):
             filled = np.asarray(filled)
         if filled.dtype.names is None:
-            return add_new_field_to(a, (new_field, *filled.dtype.descr[0][1:]), filled, insert_to)
+            return add_new_field_to(a, (new_fields, *filled.dtype.descr[0][1:]), filled, insert_to)
         else:
-            return add_new_field_to(a, [(new_field, filled.dtype.descr)], filled, insert_to)
+            return add_new_field_to(a, [(new_fields, filled.dtype.descr)], filled, insert_to)
     else:
-        raise ValueError(new_field)
+        raise ValueError(new_fields)
 
 
 def remove_field_from(a, field):

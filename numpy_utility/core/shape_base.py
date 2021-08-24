@@ -6,16 +6,15 @@ from . import fromnumeric as _fromnumeric_module
 __all__ = ["merge_arrays"]
 
 
-def get_extended_dtype(type1, type2):
-    type1 = np.dtype(type1)
-    type2 = np.dtype(type2)
-    assert type1.kind == type2.kind
-    assert type1.byteorder == type2.byteorder
-    kind = type1.kind
-    byteorder = type1.byteorder
+def get_extended_dtype(type1, type2, *types):
+    types = list(map(np.dtype, itertools.chain([type1, type2], types)))
+    assert all(types[0].kind == type_.kind for type_ in types[1:])
+    assert all(types[0].byteorder == type_.byteorder for type_ in types[1:])
+    kind = types[0].kind
+    byteorder = types[0].byteorder
     unit_itemsizes = {"i": 1, "f": 1, "S": 1, "U": 4}
     if kind in ("i", "f", "S", "U"):
-        return f"{byteorder}{kind}{max(type1.itemsize, type2.itemsize) // unit_itemsizes[kind]}"
+        return f"{byteorder}{kind}{max(type_.itemsize for type_ in types) // unit_itemsizes[kind]}"
     elif kind == "M":
         raise NotImplementedError
     elif kind == "m":
@@ -25,20 +24,18 @@ def get_extended_dtype(type1, type2):
 
 
 def merge_arrays(arrays, validate_unique_columns=True):
+    assert len(arrays) > 1
+    common_dtype_names = list(set(arrays[0].dtype.names).intersection(*(a.dtype.names for a in arrays[1:])))
+
     common_dtypes = [
-        [
-            (s_d[0], get_extended_dtype(s_d[1], f_d[1]))
-            for f_d, s_d in itertools.product(f.descr, s.descr) if f_d[0] == s_d[0] and len(f_d) == len(s_d) == 2
-        ]
-        for f, s in itertools.combinations((a.dtype for a in arrays), 2)
+        (common_dtype_name, get_extended_dtype(*(a.dtype[common_dtype_name] for a in arrays)))
+        for common_dtype_name in common_dtype_names
     ]
 
-    # assert len(arrays) == 2
-    # assert len(common_dtypes) == 1
     assert len(common_dtypes) > 0
-    assert all(common_dtypes[0] == dtypes for dtypes in common_dtypes[1:])  # 全てのaが共通のdtypeを持つ
-    common_dtypes = common_dtypes[0]
-    common_dtype_names = [name for name, *_ in common_dtypes]
+    # assert all(common_dtypes[0] == dtypes for dtypes in common_dtypes[1:])  # 全てのaが共通のdtypeを持つ
+    # common_dtypes = common_dtypes[0]
+    # common_dtype_names = [name for name, *_ in common_dtypes]
     arrays_dtypes = [
         [d for d in a.dtype.descr if d[0] not in common_dtype_names]
         for a in arrays
