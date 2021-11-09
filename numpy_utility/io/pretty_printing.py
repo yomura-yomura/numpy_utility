@@ -35,10 +35,7 @@ def structured_array_to_str(a: np.ndarray, totals=None, latest=None, spacing="  
     assert a.ndim == 1
     a_str_flatten_dict = flatten_nested_dictionary(_to_dict_as_str(a))
     max_n_length_of_values = list(map(lambda a: max(map(len, a)), a_str_flatten_dict.values()))
-    # max_n_length_of_names = [
-    #     list(map(lambda names: len(names[i]) if i < len(names) else 0, a_str_flatten_dict.keys()))
-    #     for i in range(max(map(len, a_str_flatten_dict.keys())))
-    # ]
+
     n_depths_of_names = max(map(len, a_str_flatten_dict.keys()))
     max_n_length_of_names = list(map(lambda names: len(names[-1]), a_str_flatten_dict.keys()))
     max_n_length_for_col = list(map(max, zip(max_n_length_of_values, max_n_length_of_names)))
