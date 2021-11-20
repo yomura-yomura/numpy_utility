@@ -61,7 +61,8 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
         bins = np.min(a) + bins.astype(f"timedelta64[{time_unit}]")
         return bins
     elif is_integer(a):
-        bins = np.unique(a)
+        pass
+    #     bins = np.unique(a)
     elif is_floating(a):
         pass
     elif np.issubdtype(a.dtype, np.bool_) or np.issubdtype(a.dtype, np.str_):
