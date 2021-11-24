@@ -475,16 +475,19 @@ def to_tidy_data(dict_obj: dict, new_level_name="level_0", field_names=None):
     value_dtype_field_names_list = [v.dtype.names for v in dict_obj.values()]
     assert builtins.all(value_dtype_field_names_list[0] == field_name for field_name in value_dtype_field_names_list[1:])
     value_dtype_field_names = value_dtype_field_names_list[0]
-    
+
     is_multi_columns = len(value_shape) != 0 or value_dtype_field_names is not None
     assert not (len(value_shape) != 0 and value_dtype_field_names is not None)
 
     if field_names is None:
-        if is_multi_columns:
-            n_var = value_shape[0] if len(value_shape) != 0 else len(value_dtype_field_names)
-            field_names = tuple(str(i) for i in range(n_var))
+        if value_dtype_field_names is None:
+            if is_multi_columns:
+                n_var = value_shape[0] if len(value_shape) != 0 else len(value_dtype_field_names)
+                field_names = tuple(str(i) for i in range(n_var))
+            else:
+                field_names = ("0",)
         else:
-            field_names = ("0",)
+            field_names = value_dtype_field_names
 
     key_dtype = np.array(list(dict_obj.keys())).dtype
     value_dtypes = [v.dtype for v in dict_obj.values()]

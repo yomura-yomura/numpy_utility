@@ -7,7 +7,8 @@ from .. import core as _core_module
 
 __all__ = [
     "is_structured_array",
-    "for_masked_array"
+    "for_masked_array",
+    "array_from_nonmasked_values"
 ]
 
 
@@ -57,3 +58,11 @@ def for_masked_array(func):
             a = func(first_arg, *args, **kwargs)
         return a
     return _inner
+
+
+def array_from_nonmasked_values(a_nonmasked, mask, dtype=None):
+    mask = np.asarray(mask)
+    a = np.ma.empty(mask.shape, dtype=dtype)
+    a[~mask] = a_nonmasked
+    a.mask = mask
+    return a
