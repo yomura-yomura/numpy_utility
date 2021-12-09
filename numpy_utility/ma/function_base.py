@@ -62,6 +62,8 @@ def for_masked_array(func):
 
 def array_from_nonmasked_values(a_nonmasked, mask, dtype=None):
     mask = np.asarray(mask)
+    if dtype is None and isinstance(a_nonmasked, np.ndarray):
+        dtype = a_nonmasked.dtype
     a = np.ma.empty(mask.shape, dtype=dtype)
     a[~mask] = a_nonmasked
     a.mask = mask

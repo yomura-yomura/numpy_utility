@@ -6,9 +6,43 @@ import datetime as dt
 __all__ = ["print_structured_array"]
 
 
+def numeric_as_str(n, digits=4):
+    if npu.is_floating(n):
+        n_digits = int(np.ceil(abs(np.log10(n))))
+
+        if n >= 1:
+            if n_digits < digits:
+                return f"{n:.{digits - n_digits}f}"
+            elif n_digits == digits:
+                return f"{n:.0f}."
+            else:
+                return f"{n:.2e}"
+        else:
+            if n_digits < digits:
+                return f"{n:.{digits}f}"
+            else:
+                return f"{n:.2e}"
+
+    else:
+        return f"{n}"
+
+
+def as_str(o):
+    if npu.is_numeric(o):
+        return numeric_as_str(o)
+    else:
+       return str(o)
+
+
 def _to_dict_as_str(a: np.ndarray, filled="-"):
     if a.dtype.names is None:
-        a = a.astype(str)
+        if a.ndim == 0:
+            a = as_str(a)
+        elif a.ndim == 1:
+            a = list(map(as_str, a))
+        else:
+            a = [f"({a.ndim}-dim not implemented)"] * len(a)
+
         if np.ma.isMaskedArray(a):
             return a.filled(filled)
         else:
