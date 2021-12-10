@@ -5,6 +5,7 @@ import numpy.lib.recfunctions
 from ..core import is_integer
 import builtins
 from collections.abc import Iterable
+import itertools
 
 
 __all__ = [
@@ -246,10 +247,20 @@ def reshape(a, newshape, drop=True):
         return a.reshape(newshape)
 
 
-def flatten_structured_array(a, sep="/", flatten_2d=True):
+def flatten_structured_array(a, sep="/", flatten_ndims=True):
     if a.dtype.names is None:
-        if flatten_2d and a.ndim == 2:
-            return from_dict(dict(zip(map(str, range(a.shape[-1])), np.rollaxis(a, axis=1))))
+        if flatten_ndims and a.ndim > 1:
+            if a.ndim == 2:
+                return from_dict(dict(
+                    zip(map(str, range(a.shape[-1])), np.rollaxis(a, axis=-1))
+                ), sep, flatten_ndims)
+            elif a.ndim == 3:
+                return from_dict({
+                    sep.join(map(str, indices)): a[..., indices[-2], indices[-1]]
+                    for indices in itertools.product(range(a.shape[-2]), range(a.shape[-1]))
+                }, sep, flatten_ndims)
+            else:
+                raise NotImplementedError(f"a.ndim = {a.ndim}")
         else:
             return a
     else:
@@ -260,7 +271,7 @@ def flatten_structured_array(a, sep="/", flatten_2d=True):
         # if a[name].dtype.names is None:
         #     d[name] = a[name]
         # else:
-        flatten = flatten_structured_array(a[name], sep, flatten_2d)
+        flatten = flatten_structured_array(a[name], sep, flatten_ndims)
         if flatten.dtype.names is None:
             d[name] = a[name]
         else:
@@ -420,7 +431,37 @@ def is_sorted(a):
     return builtins.all(i == i_order for i, i_order in enumerate(np.argsort(a)))
 
 
-def to_tidy_data(dict_obj: dict, new_level_name="level_0", field_names=None):
+def to_tidy_data(dict_obj: dict, new_level_name=None, field_names=None):
+    if builtins.any(map(is_array, dict_obj.keys())):
+        if not builtins.all(map(is_array, dict_obj.keys())):
+            raise ValueError("All dict_obj key must be array-like type if at-least-one array-like type is given.")
+        key_lengths = list(map(len, dict_obj.keys()))
+        if not builtins.all(key_lengths[0] == key_length for key_length in key_lengths[1:]):
+            raise ValueError("All array-like dict_obj key must have same length if array-like type is given.")
+        else:
+            key_length = key_lengths[0]
+
+        if new_level_name is None:
+            new_level_name = [f"level_{i}" for i in range(key_length)]
+
+        if not builtins.all(len(new_level_name) == len(key) for key in dict_obj.keys()):
+            raise ValueError("len(new_level_name) != len(dict_obj key)")
+
+        if len(new_level_name) == 1:
+            return to_tidy_data({k[0]: v for k, v in dict_obj.items()}, new_level_name[0], field_names)
+
+        first_new_level_name, *new_level_names = new_level_name
+        return to_tidy_data({
+            first_key: to_tidy_data(
+                dict((tuple(keys), value) for (_, *keys), value in grouped), new_level_names, field_names
+            )
+            for first_key, grouped in itertools.groupby(dict_obj.items(), key=lambda item: item[0][0])
+        }, first_new_level_name, field_names)
+    else:
+        if new_level_name is None:
+            new_level_name = "level_0"
+
+
     if builtins.any(np.ma.isMaskedArray(v) for v in dict_obj.values()):
         return np.ma.MaskedArray(
             to_tidy_data({k: np.ma.getdata(v) for k, v in dict_obj.items()}, new_level_name, field_names),

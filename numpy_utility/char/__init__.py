@@ -20,6 +20,11 @@ def join(sep, seq, axis=None):
     """
     assert is_array(seq)
 
+    if isinstance(seq, np.ma.MaskedArray):
+        raise NotImplementedError
+    else:
+        seq = np.asarray(seq)
+
     if axis is None:
         # char Element-wise join
         return np.char.join(sep, seq)
