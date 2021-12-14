@@ -58,7 +58,8 @@ def flatten_to_nested_dtype(flatten_dtypes: list):
             common_dtype_1st_name,
             flatten_to_nested_dtype([(names, dtype) for (_, *names), dtype in matched_dtypes])
         )
-    return list(itertools.starmap(f, itertools.groupby(flatten_dtypes, lambda fd: fd[0][0])))
+    key = lambda fd: fd[0][0]
+    return list(itertools.starmap(f, itertools.groupby(sorted(flatten_dtypes, key=key), key=key)))
 
 
 def merge_arrays(arrays, validate_unique_columns=True):

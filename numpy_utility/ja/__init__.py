@@ -19,7 +19,7 @@ def ndim(a):
     a = np.array(a, dtype=object)
     if np.ndim(a) == 0:
         return 0
-    elif np.ndim(a) == 1 and (len(a) == 0 or any(np.ndim(ia) == 0 for ia in a)):
+    elif np.ndim(a) == 1 and (len(a) == 0 or any(np.ndim(np.asarray(ia, dtype=object)) == 0 for ia in a)):
         return 1
     else:
         return max(ndim(ia) for ia in a) + 1
@@ -61,7 +61,9 @@ def apply(func, a, depth=-1, keepdims=True):
     if depth < 0:
         depth = ndim(a) + depth + 1
 
-    applied_flatten_a = np.array([func(ia) for ia in flatten(a, max_depth=depth)], dtype=object)
+    applied_flatten_pylist = [func(ia) for ia in flatten(a, max_depth=depth)]
+    applied_flatten_a = np.empty(len(applied_flatten_pylist), dtype=object)
+    applied_flatten_a[:] = applied_flatten_pylist
 
     if keepdims:
         new_shape = (*np.shape(np.asarray(a, dtype=object))[:depth], *applied_flatten_a.shape[1:])

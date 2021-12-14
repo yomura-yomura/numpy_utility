@@ -425,13 +425,23 @@ def sum(a, axis=None, dtype=None, out=None, keepdims=np._NoValue,
     return ret
 
 
-def is_sorted(a):
+def is_sorted(a, axis=-1):
     if isinstance(a, np.ma.MaskedArray):
+        shape_a = list(a.shape)
+        shape_a[axis] = -1
         a = a.compressed()
-    return builtins.all(i == i_order for i, i_order in enumerate(np.argsort(a)))
+        # a = a.filled(np.nan)
+        a = a.reshape(shape_a)
+    return builtins.all(
+        np.all(i == i_order)
+        for i, i_order in enumerate(np.rollaxis(np.argsort(a, axis=axis), axis=axis))
+    )
 
 
-def to_tidy_data(dict_obj: dict, new_level_name=None, field_names=None):
+def to_tidy_data(
+        dict_obj: dict,
+        new_level_name=None, field_names=None
+):
     if builtins.any(map(is_array, dict_obj.keys())):
         if not builtins.all(map(is_array, dict_obj.keys())):
             raise ValueError("All dict_obj key must be array-like type if at-least-one array-like type is given.")
@@ -447,20 +457,26 @@ def to_tidy_data(dict_obj: dict, new_level_name=None, field_names=None):
         if not builtins.all(len(new_level_name) == len(key) for key in dict_obj.keys()):
             raise ValueError("len(new_level_name) != len(dict_obj key)")
 
+        print(dict_obj.keys())
         if len(new_level_name) == 1:
-            return to_tidy_data({k[0]: v for k, v in dict_obj.items()}, new_level_name[0], field_names)
+            print(dict_obj)
+            return to_tidy_data(
+                {k[0]: v for k, v in dict_obj.items()},
+                new_level_name[0], field_names
+            )
 
         first_new_level_name, *new_level_names = new_level_name
+        key = lambda item: item[0][0]
         return to_tidy_data({
             first_key: to_tidy_data(
-                dict((tuple(keys), value) for (_, *keys), value in grouped), new_level_names, field_names
+                dict((tuple(keys), value) for (_, *keys), value in grouped),
+                new_level_names, field_names
             )
-            for first_key, grouped in itertools.groupby(dict_obj.items(), key=lambda item: item[0][0])
+            for first_key, grouped in itertools.groupby(sorted(dict_obj.items(), key=key), key=key)
         }, first_new_level_name, field_names)
     else:
         if new_level_name is None:
             new_level_name = "level_0"
-
 
     if builtins.any(np.ma.isMaskedArray(v) for v in dict_obj.values()):
         return np.ma.MaskedArray(

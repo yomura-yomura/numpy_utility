@@ -21,7 +21,9 @@ def join(sep, seq, axis=None):
     assert is_array(seq)
 
     if isinstance(seq, np.ma.MaskedArray):
-        raise NotImplementedError
+        # print(seq)
+        # raise NotImplementedError
+        pass
     else:
         seq = np.asarray(seq)
 
