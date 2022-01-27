@@ -432,10 +432,15 @@ def is_sorted(a, axis=-1):
         a = a.compressed()
         # a = a.filled(np.nan)
         a = a.reshape(shape_a)
-    return builtins.all(
-        np.all(i == i_order)
-        for i, i_order in enumerate(np.rollaxis(np.argsort(a, axis=axis), axis=axis))
-    )
+
+    roll_a = np.rollaxis(a, axis=axis)
+    diff_roll_a = np.ma.masked_invalid(roll_a[1:] - roll_a[:-1])
+    return np.ma.all(diff_roll_a >= np.array(0, dtype=diff_roll_a.dtype))
+
+    # return builtins.all(
+    #     np.all(i == i_order)
+    #     for i, i_order in enumerate(np.rollaxis(np.argsort(a, axis=axis), axis=axis))
+    # )
 
 
 def to_tidy_data(

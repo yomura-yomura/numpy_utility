@@ -48,6 +48,7 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
     #     raise TypeError(type(bins))
 
     a = a if isinstance(a, np.ndarray) else np.asarray(a)
+
     if np.issubdtype(a.dtype, np.datetime64):
         bins = histogram_bin_edges((a - np.min(a)).astype(float), bins, range, weights)
 
@@ -68,6 +69,7 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
     elif np.issubdtype(a.dtype, np.bool_) or np.issubdtype(a.dtype, np.str_):
         # Not implemented yet that bins affect nothing
         bins = np.unique(a)
+        return bins
     else:
         raise NotImplementedError(f"Unexpected type: {a.dtype}")
 
@@ -77,13 +79,26 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
             log_a = log_a[~np.isnan(log_a)]
             bins = 10 ** np.histogram_bin_edges(log_a, bins, range, weights)
         else:
-            bins = np.histogram_bin_edges(a, bins, range, weights)
+            if range is None:
+                range = (np.min(a), np.max(a))
+
+            if range[1] - range[0] > 1e7:
+                warnings.warn(
+                    "It may cause memory leak and hang"
+                    f" due to significantly different between range first and second: {range}\n"
+                    f"Use bin size {n_bins_limit}"
+                )
+                bins = np.linspace(*range, n_bins_limit)
+            else:
+                bins = np.histogram_bin_edges(a, bins, range, weights)
+
         if bins.size > n_bins_limit:
             warnings.warn(f"Huge bin size {bins.size} -> {n_bins_limit}")
             bins = np.linspace(np.min(bins), np.max(bins), n_bins_limit)
     except MemoryError as e:
         warnings.warn(f"Encountered MemoryError: {e}")
         bins = np.linspace(np.min(a), np.max(a), n_bins_limit)
+
     return bins
 
 
