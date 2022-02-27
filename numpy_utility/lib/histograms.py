@@ -37,27 +37,11 @@ def histogram_bin_widths(bins):
 def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
     if is_array(bins):
         return bins
-    # elif is_numeric(bins):
-    #     bins = np.linspace(a.min(), a.max(), bins + 1)
-    # elif isinstance(bins, str):
-    #     if bins == "auto":
-    #
-    #     else:
-    #         raise ValueError(f"{bins}")
-    # else:
-    #     raise TypeError(type(bins))
 
     a = a if isinstance(a, np.ndarray) else np.asarray(a)
-
     if np.issubdtype(a.dtype, np.datetime64):
         bins = histogram_bin_edges((a - np.min(a)).astype(float), bins, range, weights)
 
-        # if np.issubdtype(a.dtype, np.datetime64):
-        #     bins = (bins - np.min(a)).astype(int)
-        # if is_array(bins):
-        #     bins[:-1] = np.floor(bins[:-1])
-        #     bins[-1] = np.ceil(bins[-1])
-        # bins = histogram_bin_edges((a - np.min(a)).astype(int), bins, range, weights)
         time_unit = np.datetime_data(a.dtype)[0]
         bins = np.min(a) + bins.astype(f"timedelta64[{time_unit}]")
         return bins
@@ -77,20 +61,24 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
         if log:
             log_a = np.log10(a)
             log_a = log_a[~np.isnan(log_a)]
-            bins = 10 ** np.histogram_bin_edges(log_a, bins, range, weights)
+            bins = 10 ** histogram_bin_edges(log_a, bins, range, weights, log=False)
         else:
             if range is None:
                 range = (np.min(a), np.max(a))
 
-            if range[1] - range[0] > 1e7:
+            if (
+                    (range[1] - range[0] < 1e7) or
+                    (bins is not None)
+            ):
+                # print(bins)
+                bins = np.histogram_bin_edges(a, bins, range, weights)
+            else:
                 warnings.warn(
                     "It may cause memory leak and hang"
                     f" due to significantly different between range first and second: {range}\n"
                     f"Use bin size {n_bins_limit}"
                 )
                 bins = np.linspace(*range, n_bins_limit)
-            else:
-                bins = np.histogram_bin_edges(a, bins, range, weights)
 
         if bins.size > n_bins_limit:
             warnings.warn(f"Huge bin size {bins.size} -> {n_bins_limit}")

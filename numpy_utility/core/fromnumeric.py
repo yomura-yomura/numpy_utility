@@ -432,7 +432,6 @@ def is_sorted(a, axis=-1):
         a = a.compressed()
         # a = a.filled(np.nan)
         a = a.reshape(shape_a)
-
     roll_a = np.rollaxis(a, axis=axis)
     diff_roll_a = np.ma.masked_invalid(roll_a[1:] - roll_a[:-1])
     return np.ma.all(diff_roll_a >= np.array(0, dtype=diff_roll_a.dtype))
@@ -441,6 +440,48 @@ def is_sorted(a, axis=-1):
     #     np.all(i == i_order)
     #     for i, i_order in enumerate(np.rollaxis(np.argsort(a, axis=axis), axis=axis))
     # )
+
+
+def to_ndarray(obj):
+    if isinstance(obj, np.ndarray):
+        return obj
+    elif is_array(obj):
+        from .. import ja
+        ndim = ja.ndim(obj)
+        if ndim == 1:
+            obj = np.array(obj)
+        elif ndim == 2:
+            obj = np.array(obj, dtype="O")
+            dtypes = [np.array(col.tolist()).dtype for col in np.rollaxis(obj, axis=1)]
+            names = [f"f{i}" for i in range(len(dtypes))]
+            obj = np.array(list(map(tuple, obj)), list(zip(names, dtypes)))
+        else:
+            raise NotImplementedError
+    elif isinstance(obj, Iterable):
+        obj = list(obj)
+    else:
+        print(obj)
+        raise TypeError(type(obj))
+    return to_ndarray(obj)
+
+
+def get_common_dtype(value_dtypes):
+    value_dtypes = list(value_dtypes)
+    value_dtype_kinds = [v_dtype.kind for v_dtype in value_dtypes]
+    unique_value_dtype_kinds = np.unique(value_dtype_kinds)
+    # if not builtins.all(value_dtype_kinds[0] == value_dtype_kind for value_dtype_kind in value_dtype_kinds):
+    #     print(value_dtypes)
+    if len(unique_value_dtype_kinds) == 1:
+        value_dtype = max(value_dtypes, key=lambda dtype: dtype.itemsize)
+    elif len(unique_value_dtype_kinds) == 0:
+        raise NotImplementedError
+    else:
+        if np.all(np.isin(unique_value_dtype_kinds, ["f", "i", "u"])):
+            value_dtype = np.dtype("f8")
+        else:
+            raise TypeError("different dtypes found in dict_obj")
+
+    return value_dtype
 
 
 def to_tidy_data(
@@ -462,9 +503,7 @@ def to_tidy_data(
         if not builtins.all(len(new_level_name) == len(key) for key in dict_obj.keys()):
             raise ValueError("len(new_level_name) != len(dict_obj key)")
 
-        print(dict_obj.keys())
         if len(new_level_name) == 1:
-            print(dict_obj)
             return to_tidy_data(
                 {k[0]: v for k, v in dict_obj.items()},
                 new_level_name[0], field_names
@@ -485,36 +524,21 @@ def to_tidy_data(
 
     if builtins.any(np.ma.isMaskedArray(v) for v in dict_obj.values()):
         return np.ma.MaskedArray(
-            to_tidy_data({k: np.ma.getdata(v) for k, v in dict_obj.items()}, new_level_name, field_names),
+            to_tidy_data({
+                k: np.ma.getdata(v)
+                for k, v in dict_obj.items()
+            }, new_level_name, field_names),
             change_field_format_to(
-                to_tidy_data({k: np.ma.getmask(v) for k, v in dict_obj.items()}, new_level_name, field_names),
+                to_tidy_data({
+                    k: np.ma.getmask(v) if np.ma.isMaskedArray(v) else [False] * len(v)
+                    for k, v in dict_obj.items()
+                }, new_level_name, field_names),
                 {new_level_name: "?"}, {new_level_name: False}
             )
         )
 
     if field_names is not None and not is_array(field_names):
         field_names = [field_names]
-
-    def to_ndarray(obj):
-        if isinstance(obj, np.ndarray):
-            return obj
-        elif is_array(obj):
-            from .. import ja
-            ndim = ja.ndim(obj)
-            if ndim == 1:
-                obj = np.array(obj)
-            elif ndim == 2:
-                obj = np.array(obj, dtype="O")
-                dtypes = [np.array(col.tolist()).dtype for col in np.rollaxis(obj, axis=1)]
-                names = [f"f{i}" for i in range(len(dtypes))]
-                obj = np.array(list(map(tuple, obj)), list(zip(names, dtypes)))
-            else:
-                raise NotImplementedError
-        elif isinstance(obj, Iterable):
-            obj = list(obj)
-        else:
-            raise TypeError(type(obj))
-        return to_ndarray(obj)
 
     dict_obj = {k: to_ndarray(v) for k, v in dict_obj.items()}
 
@@ -553,12 +577,6 @@ def to_tidy_data(
 
     key_dtype = np.array(list(dict_obj.keys())).dtype
     value_dtypes = [v.dtype for v in dict_obj.values()]
-
-    def get_common_dtype(value_dtypes):
-        if not builtins.all(value_dtypes[0].kind == v_dtype.kind for v_dtype in value_dtypes[1:]):
-            raise TypeError("different dtypes found in dict_obj")
-        value_dtype = max(value_dtypes, key=lambda dtype: dtype.itemsize)
-        return value_dtype
 
     if value_dtype_field_names is not None:
         value_dtypes = [
