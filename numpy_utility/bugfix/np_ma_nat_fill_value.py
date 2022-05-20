@@ -1,7 +1,6 @@
 import numpy as np
 import warnings
 
-
 __all__ = ["is_not_fixed_yet", "fix"]
 
 

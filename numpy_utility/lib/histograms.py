@@ -3,7 +3,6 @@ import warnings
 from ..core.numerictypes import is_integer, is_floating, is_numeric
 from ..core.fromnumeric import is_array
 
-
 __all__ = ["histogram", "histogram_bin_edges", "histogram_bin_centers", "histogram_bin_widths"]
 n_bins_limit = 10000
 

@@ -1,6 +1,5 @@
 import numpy as np
 
-
 __all__ = ["norm", "dot", "angle", "normalized"]
 
 

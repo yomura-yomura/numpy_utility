@@ -1,6 +1,5 @@
 import numpy as np
 
-
 __all__ = ["trunc", "add", "subtract"]
 
 
@@ -45,4 +44,3 @@ def subtract(x1, x2, *args, **kwargs):
         for name in x1.dtype.names:
             new_x[name] = subtract(x1[name], x2[name], *args, **kwargs)
     return new_x
-

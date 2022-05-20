@@ -4,7 +4,6 @@ import numpy as np
 import functools
 from .. import core as _core_module
 
-
 __all__ = [
     "is_structured_array",
     "for_masked_array",
@@ -57,6 +56,7 @@ def for_masked_array(func):
         else:
             a = func(first_arg, *args, **kwargs)
         return a
+
     return _inner
 
 

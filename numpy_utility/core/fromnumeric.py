@@ -1,11 +1,10 @@
-import inspect
-
 import numpy as np
 import numpy.lib.recfunctions
 from ..core import is_integer
 import builtins
 from collections.abc import Iterable
 import itertools
+import numpy.ma.mrecords
 
 
 __all__ = [
@@ -32,7 +31,7 @@ __all__ = [
 
 
 def get_array_matched_with_boolean_array(a, boolean_array, remove_all_masked_rows=False):
-    assert(1 <= boolean_array.ndim <= 2)
+    assert (1 <= boolean_array.ndim <= 2)
     # assert(a.size == boolean_array.shape[-1])
     a, boolean_array = np.broadcast_arrays(a, boolean_array)
 
@@ -42,7 +41,7 @@ def get_array_matched_with_boolean_array(a, boolean_array, remove_all_masked_row
     new_array.mask = ~boolean_array
 
     if remove_all_masked_rows:
-        assert(new_array.ndim >= 2)
+        assert (new_array.ndim >= 2)
         new_array = new_array[~np.all(new_array.mask.view(bool), axis=-1)]
 
     return new_array
@@ -50,8 +49,8 @@ def get_array_matched_with_boolean_array(a, boolean_array, remove_all_masked_row
 
 def is_array(obj):
     return (
-        isinstance(obj, (list, tuple, set)) or
-        (isinstance(obj, np.ndarray) and np.ndim(obj) != 0)
+            isinstance(obj, (list, tuple, set)) or
+            (isinstance(obj, np.ndarray) and np.ndim(obj) != 0)
     )
 
 
@@ -314,7 +313,7 @@ class GroupBy:
         if self.iter_with is None:
             return key, self.a[boolean_array]
         else:
-            return key, self.a[boolean_array], *(item[boolean_array] for item in self.iter_with)
+            return (key, self.a[boolean_array], *(item[boolean_array] for item in self.iter_with))
 
     def __iter__(self):
         return (
@@ -559,7 +558,8 @@ def to_tidy_data(
     assert len(value_shape) in (0, 1)
 
     value_dtype_field_names_list = [v.dtype.names for v in dict_obj.values()]
-    assert builtins.all(value_dtype_field_names_list[0] == field_name for field_name in value_dtype_field_names_list[1:])
+    assert builtins.all(
+        value_dtype_field_names_list[0] == field_name for field_name in value_dtype_field_names_list[1:])
     value_dtype_field_names = value_dtype_field_names_list[0]
 
     is_multi_columns = len(value_shape) != 0 or value_dtype_field_names is not None
@@ -592,7 +592,6 @@ def to_tidy_data(
         return np.array([(k, *iv) for k, v in dict_obj.items() for iv in v], dtype)
     else:
         return np.array([(k, iv) for k, v in dict_obj.items() for iv in v], dtype)
-
 
 # def fields_view(arr, *field_names):
 #     if np.ma.isMaskedArray(arr):

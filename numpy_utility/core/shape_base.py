@@ -1,8 +1,6 @@
 import itertools
 import numpy as np
-import collections
 from . import fromnumeric as _fromnumeric_module
-
 
 __all__ = ["merge_arrays"]
 
@@ -53,11 +51,12 @@ def flatten_to_nested_dtype(flatten_dtypes: list):
         matched_dtypes = list(matched_dtypes)
         n_depths = [len(matched_dtype[0]) for matched_dtype in matched_dtypes]
         if len(n_depths) == 1 and n_depths[0] == 1:
-            return common_dtype_1st_name, *matched_dtypes[0][1:]
+            return (common_dtype_1st_name, *matched_dtypes[0][1:])
         return (
             common_dtype_1st_name,
             flatten_to_nested_dtype([(names, dtype) for (_, *names), dtype in matched_dtypes])
         )
+
     key = lambda fd: fd[0][0]
     return list(itertools.starmap(f, itertools.groupby(sorted(flatten_dtypes, key=key), key=key)))
 
@@ -95,8 +94,8 @@ def merge_arrays(arrays, validate_unique_columns=True):
 
     if validate_unique_columns:
         if not all(
-            shape_v == shape_a
-            for shape_v, shape_a in zip(map(np.shape, arrays_values_at_common_dtype), map(np.shape, arrays))
+                shape_v == shape_a
+                for shape_v, shape_a in zip(map(np.shape, arrays_values_at_common_dtype), map(np.shape, arrays))
         ):
             i = next(
                 i

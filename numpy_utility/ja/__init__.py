@@ -4,7 +4,6 @@ functions for jagged array
 from ..core import is_array
 import numpy as np
 
-
 __all__ = ["ndim", "flatten", "apply", "from_jagged_array", "reshape"]
 
 

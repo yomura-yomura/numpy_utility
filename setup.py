@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='numpy_utility',
-    version='1.91',
+    version='1.10.0',
     description='',
     author='yomura',
     author_email='yomura@hoge.jp',
@@ -10,6 +10,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy",
-        "more-itertools"
+        "more-itertools",
+        "pandas",
+        "tqdm"
     ]
 )

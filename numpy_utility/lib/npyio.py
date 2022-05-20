@@ -2,7 +2,6 @@ import numpy as np
 from .. import ja
 from .. import core
 
-
 __all__ = [
     "savez",
     "load",
@@ -36,7 +35,7 @@ def savez(file, *args, **kwargs):
     kwargs.update(kwargs_from_args)
 
     mask_dict = {
-        suffix_for_masked_array+k: a.mask
+        suffix_for_masked_array + k: a.mask
         for k, a in kwargs.items()
         if isinstance(a, np.ma.MaskedArray)
     }

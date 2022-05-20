@@ -4,14 +4,17 @@ import functools
 import tqdm
 import sys
 
-
 __all__ = [
     "vectorize",
     "vectorize_wrapper"
 ]
 
 
-def vectorize(func, progress_kwargs={}, multi_output=False, errors="raise", return_as_numpy_array=True, ignore_kwargs=()):
+def vectorize(func, progress_kwargs=None, multi_output=False, errors="raise", return_as_numpy_array=True,
+              ignore_kwargs=()):
+    if progress_kwargs is None:
+        progress_kwargs = {}
+
     def _len(a):
         try:
             return len(a)
@@ -103,7 +106,12 @@ def vectorize(func, progress_kwargs={}, multi_output=False, errors="raise", retu
     return _inner
 
 
-def vectorize_wrapper(progress_kwargs={}, multi_output=False, errors="raise", return_as_numpy_array=True, ignore_kwargs=()):
+def vectorize_wrapper(progress_kwargs=None, multi_output=False, errors="raise", return_as_numpy_array=True,
+                      ignore_kwargs=()):
+    if progress_kwargs is None:
+        progress_kwargs = {}
+
     def _inner(func):
         return vectorize(func, progress_kwargs, multi_output, errors, return_as_numpy_array, ignore_kwargs)
+
     return _inner

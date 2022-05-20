@@ -31,7 +31,7 @@ def as_str(o):
     if npu.is_numeric(o):
         return numeric_as_str(o)
     else:
-       return str(o)
+        return str(o)
 
 
 def _to_dict_as_str(a: np.ndarray, filled="-"):
@@ -60,6 +60,7 @@ def flatten_nested_dictionary(d: dict):
                 _parse(v, *keys, k)
             else:
                 stack.append(((*keys, k), v))
+
     _parse(d)
     return dict(stack)
 
@@ -83,15 +84,15 @@ def structured_array_to_str(a: np.ndarray, totals=None, latest=None, spacing="  
             for name, grouped_n_lens in (
                 (name, [e for _, e in grouped])
                 for name, grouped in itertools.groupby(
-                    sorted(
-                        zip(
-                            [names[i] if i < len(names) else "" for names in a_str_flatten_dict.keys()],
-                            max_n_length_for_col
-                        ),
-                        key=lambda r: r[0]
+                sorted(
+                    zip(
+                        [names[i] if i < len(names) else "" for names in a_str_flatten_dict.keys()],
+                        max_n_length_for_col
                     ),
                     key=lambda r: r[0]
-                )
+                ),
+                key=lambda r: r[0]
+            )
             )
         )
         for i in range(n_depths_of_names)

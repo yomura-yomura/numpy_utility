@@ -6,7 +6,8 @@ import numpy as np
 __all__ = ["binning", "get_indices_groups_of_continuous_duplicate_numbers"]
 
 
-def binning(x, y, min_bin_x=None, max_bin_x=None, step_bin_x=1, sqrt_n_division=True, allowed_minimum_size=None, return_sample_size=False):
+def binning(x, y, min_bin_x=None, max_bin_x=None, step_bin_x=1, sqrt_n_division=True, allowed_minimum_size=None,
+            return_sample_size=False):
     """
     x, y : array-like object, MaskedArray
     """
@@ -28,7 +29,7 @@ def binning(x, y, min_bin_x=None, max_bin_x=None, step_bin_x=1, sqrt_n_division=
         for lower_x, upper_x in zip(_binned_x[:-1], _binned_x[1:])
     ]
 
-    binned_x = _binned_x[:-1] + step_bin_x/2
+    binned_x = _binned_x[:-1] + step_bin_x / 2
 
     if allowed_minimum_size is not None:
         binned_x = binned_x[[True if allowed_minimum_size <= y.size else False for y in _binned_y]]

@@ -1,7 +1,6 @@
 import numpy as np
 import functools
 
-
 __all__ = [
     "save_and_load"
 ]
@@ -57,5 +56,7 @@ def save_and_load(filename, suffix=".npz", arg=None):
                         np.savez(buffer_name, **npz_obj, **{f"{arg}": results})
 
             return func(**kwargs)
+
         return _inner
+
     return _outer
