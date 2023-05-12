@@ -70,7 +70,7 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
                     (bins is not None)
             ):
                 # print(bins)
-                bins = np.histogram_bin_edges(a, bins, range, weights)
+                bins = np.histogram_bin_edges(a, bins=bins, range=range, weights=weights)
             else:
                 warnings.warn(
                     "It may cause memory leak and hang"
@@ -90,18 +90,16 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None, log=False):
 
 
 def histogram(a, bins=10, range=None, weights=None, density=None):
-    normed = None
-
     assert a.ndim == 1
 
     bins = histogram_bin_edges(a, bins, range, weights)
 
     if is_numeric(a):
-        counts, bins = np.histogram(a, bins, range, normed, weights, density)
+        counts, bins = np.histogram(a, bins=bins, range=range, weights=weights, density=density)
     elif np.issubdtype(a.dtype, np.datetime64):
         subtracted_bins = (bins - np.min(a)).astype(int)
         subtracted_a = (a - np.min(a)).astype(int)
-        counts, _ = np.histogram(subtracted_a, subtracted_bins, range, normed, weights, density)
+        counts, _ = np.histogram(a, bins=bins, range=range, weights=weights, density=density)
         time_unit = np.datetime_data(a.dtype)[0]
         bins = np.min(a) + subtracted_bins.astype(f"timedelta64[{time_unit}]")
     elif np.issubdtype(a.dtype, np.bool_) or np.issubdtype(a.dtype, np.str_):
